@@ -1,0 +1,130 @@
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotCharacterAPI = Java.type("haven.purus.pbot.PBotCharacterAPI");
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
+const window = PBotUtils.PBotWindow(ui, "StoneDigger", 50, 110, ScriptID);
+const btnStart = window.addButton("btnStartClick", "Start", 30, 35, 30);
+let stop;
+let stockpileName = 'gfx/terobjs/stockpile-clay';
+let stone = "Basalt";
+
+
+function selectTiles(){
+	let stoneTiles = [];
+	PBotUtils.sysMsg(ui, "Select area to dig stones from!");
+	PBotUtils.selectArea(ui);
+	const aCoordDig = PBotUtils.getSelectedAreaA();
+	const bCoordDig = PBotUtils.getSelectedAreaB();
+	const maxX = Math.max(aCoordDig.x, bCoordDig.x);
+	const minX = Math.min(aCoordDig.x, bCoordDig.x);
+	const maxY = Math.max(aCoordDig.y, bCoordDig.y);
+	const minY = Math.min(aCoordDig.y, bCoordDig.y);
+	console.log(maxX + " ja " + minX + " JA " + maxY + " ja " + minY);
+	for(let i=minY; i<maxY; i += 11) {
+		for(let j=minX; j<maxX; j += 11) {
+			if(PBotUtils.tileResnameAt(ui, j, i) === "gfx/tiles/mountain") {
+				stoneTiles.push({x: j, y: i});
+			}
+		}
+	}
+	return stoneTiles;
+}
+function selectStockpiles(){
+	let stockpiles = [];
+	PBotUtils.sysMsg(ui, "Select area with stockpiles!");
+	PBotUtils.selectArea(ui);
+	const gobs = PBotUtils.gobsInArea(ui, PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
+	for(let i=0; i<gobs.size(); i++) {
+		if(gobs[i].getResname() === stockpileName)
+			stockpiles.push(gobs[i]);
+	}
+	return stockpiles;
+}
+function dig (tiles){
+	PBotUtils.pfLeftClick(ui, tiles[0].x, tiles[0].y);
+	PBotCharacterAPI.doAct(ui, "dig");
+	PBotUtils.mapClick(ui, tiles[0].x, tiles[0].y, 1, 0);
+	PBotCharacterAPI.cancelAct(ui);
+	if(!PBotUtils.getHourglass(ui) >= 0) {
+		PBotUtils.waitForHourglass(ui);
+	}
+}
+
+
+const main = () => {
+	let stop = false;
+	let stoneStored = 0
+	let stoneInvAmount = PBotUtils.playerInventory(ui).getInventoryItemsByNames(stone).size();
+	let stoneTiles = selectTiles();
+	let stoneStockpiles = selectStockpiles();
+
+	do {
+		stop = false;
+		let stoneStoredLabel = window.addLabel("stone stored: " + stoneStored, 10, 10);
+		let stoneStockpilesLabel = window.addLabel("stockpiles left: " + stoneStockpiles.length, 10, 30);
+		if(stoneStockpiles.length === 0) {
+			PBotUtils.sysMsg(ui, "Out of stockpiles!");
+			stop = true;
+			break;
+		}
+		//Digging the stone up
+		while(!stop && !window.closed() && PBotUtils.playerInventory(ui).freeSlotsInv() > 5){
+			if(PBotCharacterAPI.getStamina(ui) < 90)
+				PBotUtils.drink(ui, true);
+			if(PBotCharacterAPI.getEnergy(ui) < 40){
+				PBotUtils.sysMsg(ui, "Not Enough Energy! (70+)");
+				stop = true;
+				break;
+			}
+
+			dig(stoneTiles);
+            PBotUtils.sleep(200);
+            PBotUtils.drink(ui, true);
+            
+			PBotUtils.dropItemFromHand(ui, 100);
+			PBotUtils.sleep(200);
+		}
+		//storing the stone in stockpiles
+		if(stoneStockpiles.length == 0) {
+			stop = true;
+			PBotUtils.sysMsg(ui, "Ran out of free stockpiles!");
+			break;
+		}
+
+		PBotUtils.pfRightClick(ui, stoneStockpiles[0], 0);
+
+		PBotWindowAPI.waitForWindow(ui, "Stockpile");
+
+		if (PBotWindowAPI.getWindow(ui, "Stockpile")){
+			stoneInvAmount = PBotUtils.playerInventory(ui).getInventoryItemsByNames(stone).size();
+			const slots = PBotWindowAPI.getStockpileTotalCapacity(ui);
+			const used = PBotWindowAPI.getStockpileUsedCapacity(ui);
+			const count = Math.min(stoneInvAmount, slots-used);
+
+			PBotWindowAPI.putItemFromInventoryToStockpile(ui, count);
+			PBotUtils.sysMsg(ui, "Tried to add: " + count + " Into a stockpile containing: " + used + "/" + slots);
+			PBotUtils.sleep(200);
+
+			stoneStored += count;
+			stoneInvAmount -= count;
+			stoneStoredLabel.destroy();
+			stoneStoredLabel = window.addLabel("stone stored: " + stoneStored, 10, 10);
+			if(count + used === slots){
+				PBotUtils.sysMsg(ui, "Stockpile Full, starting with a new one ..");
+				stoneStockpiles.shift();
+			}
+		} else {
+			PBotUtils.sysMsg(ui, "Could not find stockpile window!");
+		}
+		stoneStoredLabel.destroy();
+		stoneStockpilesLabel.destroy();
+		PBotUtils.sleep(500);
+	} while (!stop && !window.closed());
+	PBotUtils.sysMsg(ui, "Finished! Total stone dug: " + stoneStored);
+}
+
+function btnStartClick(){
+	btnStart.destroy();
+	main();
+}
