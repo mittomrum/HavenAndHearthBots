@@ -6,7 +6,7 @@ const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
 const window = PBotUtils.PBotWindow(ui, "StoneDigger", 50, 110, ScriptID);
 const btnStart = window.addButton("btnStartClick", "Start", 30, 35, 30);
 let stop;
-let stockpileName = 'gfx/terobjs/stockpile-clay';
+let stockpileName = 'gfx/terobjs/stockpile-stone';
 let stone = "Basalt";
 
 
@@ -37,6 +37,7 @@ function selectStockpiles(){
 	const gobs = PBotUtils.gobsInArea(ui, PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
 	for(let i=0; i<gobs.size(); i++) {
 		if(gobs[i].getResname() === stockpileName)
+			PBotUtils.sysMsg(ui, "gobs[i].getResname() === stockpileName" + gobs[i].getResname() + "=" + stockpileName);
 			stockpiles.push(gobs[i]);
 	}
 	return stockpiles;
