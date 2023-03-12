@@ -1,0 +1,104 @@
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotCharacterAPI = Java.type("haven.purus.pbot.PBotCharacterAPI");
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
+const window = PBotUtils.PBotWindow(ui, "itempickup", 50, 110, ScriptID);
+const btnStart = window.addButton("btnStartClick", "Start", 30, 35, 30);
+let stop;
+let stockpileName = 'gfx/terobjs/stockpile-flaxfibre';
+let item = "FlaxFibre";
+
+function selectStockpiles(){
+	let stockpiles = [];
+	PBotUtils.sysMsg(ui, "Select area to cleanup!");
+	PBotUtils.selectArea(ui);
+	const gobs = PBotUtils.gobsInArea(ui, PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
+	for(let i=0; i<gobs.size(); i++) {
+		if(gobs[i].getResname() === stockpileName)
+			stockpiles.push(gobs[i]);
+	}
+	return stockpiles;
+}
+
+function pickup(){
+
+}
+
+
+const main = () => {
+	let stop = false;
+	let itemsStored = 0
+	let itemsAmount = PBotUtils.playerInventory(ui).getInventoryItemsByNames(item).size();
+	let itemStockpiles = selectStockpiles();
+
+	do {
+		stop = false;
+		let itemsStoredLabel = window.addLabel("item stored: " + itemsStored, 10, 10);
+		let itemStockpilesLabel = window.addLabel("stockpiles left: " + itemStockpiles.length, 10, 30);
+		if(itemStockpiles.length === 0) {
+			PBotUtils.sysMsg(ui, "Out of stockpiles!");
+			stop = true;
+			break;
+		}
+		//pickupging the item up
+		while(!stop && !window.closed() && PBotUtils.playerInventory(ui).freeSlotsInv() > 5){
+			if(PBotCharacterAPI.getStamina(ui) < 90)
+				PBotUtils.drink(ui, true);
+			if(PBotCharacterAPI.getEnergy(ui) < 40){
+				PBotUtils.sysMsg(ui, "Not Enough Energy! (70+)");
+				stop = true;
+				break;
+			}
+
+			pickup(itemTiles);
+            PBotUtils.sleep(200);
+            PBotUtils.drink(ui, true);
+            
+			PBotUtils.dropItemFromHand(ui, 100);
+			PBotUtils.sleep(200);
+		}
+		//storing the item in stockpiles
+		if(itemStockpiles.length == 0) {
+			stop = true;
+			PBotUtils.sysMsg(ui, "Ran out of free stockpiles!");
+			break;
+		}
+
+		PBotUtils.pfRightClick(ui, itemStockpiles[0], 0);
+
+		PBotWindowAPI.waitForWindow(ui, "Stockpile");
+
+		if (PBotWindowAPI.getWindow(ui, "Stockpile")){
+			itemsAmount = PBotUtils.playerInventory(ui).getInventoryItemsByNames(item).size();
+			PBotUtils.sysMsg(ui, "AMOUNT IN INVENTORY: " + itemsAmount);
+			const slots = PBotWindowAPI.getStockpileTotalCapacity(ui);
+			const used = PBotWindowAPI.getStockpileUsedCapacity(ui);
+			const count = Math.min(itemsAmount, slots-used);
+
+			PBotWindowAPI.putItemFromInventoryToStockpile(ui, count);
+			PBotUtils.sysMsg(ui, "Tried to add: " + count + " Into a stockpile containing: " + used + "/" + slots);
+			PBotUtils.sleep(200);
+
+			itemsStored += count;
+			itemsAmount -= count;
+			itemsStoredLabel.destroy();
+			itemsStoredLabel = window.addLabel("item stored: " + itemsStored, 10, 10);
+			if(count + used === slots){
+				PBotUtils.sysMsg(ui, "Stockpile Full, starting with a new one ..");
+				itemStockpiles.shift();
+			}
+		} else {
+			PBotUtils.sysMsg(ui, "Could not find stockpile window!");
+		}
+		itemsStoredLabel.destroy();
+		itemStockpilesLabel.destroy();
+		PBotUtils.sleep(500);
+	} while (!stop && !window.closed());
+	PBotUtils.sysMsg(ui, "Finished! Total items: " + itemsStored);
+}
+
+function btnStartClick(){
+	btnStart.destroy();
+	main();
+}
