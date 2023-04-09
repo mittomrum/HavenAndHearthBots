@@ -1,0 +1,128 @@
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotCharacterAPI = Java.type('haven.purus.pbot.PBotCharacterAPI');
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+
+////////////////
+windowWidth = 100;
+windowHeight = 200;
+const window = PBotUtils.PBotWindow(ui, "StateMan", windowWidth, windowHeight, ScriptID);
+const btnStart = window.addButton("btnStartClick", "Start", 70, windowWidth-35, 70);
+const btnStartClick = () => {
+	stop = false;
+	btnStart.hide();
+	main();
+	btnStart.show();
+}
+///////////////
+const tick = 500;
+let stop;
+const shouldStop = () => {
+	return stop || window.closed();
+};
+const main = () => {
+	if (!stop && !window.closed()) {
+	  const context = new Context();
+	  while (!shouldStop()) {
+	    context.update();
+	    waitForIdle();
+	    PBotUtils.sysMsg(ui, "Update!");
+	  }
+
+
+	//destoy the window components
+		statusLbl.destroy();
+		progressLbl.destroy();
+		estLbl.destroy();
+		timeLbl.destroy();
+		devider.destroy();
+	PBotUtils.sysMsg(ui, "done!");
+};
+
+}
+function waitForIdle() {
+  const maxWaitTICKs = 4;
+  const TICK = 200;
+  let idleCounter = maxWaitTICKs;
+  while (idleCounter >= 0) {
+    if (PBotUtils.getHourglass(ui) == -1)
+      idleCounter--;
+    else {
+      idleCounter = maxWaitTICKs;
+    }
+    PBotUtils.sleep(TICK);
+  }
+}
+class State {
+  constructor(context) {
+    this.context = context;
+  }
+  
+  enter() {}
+  
+  exit() {}
+  
+  update() {}
+}
+class WalkingState extends State {
+  enter() {
+    // perform any setup tasks for the walking state
+  }
+  
+  exit() {
+    // perform any cleanup tasks for the walking state
+  }
+  
+  update() {
+    // perform any logic needed while in the walking state
+    // transition to the processing state when done walking
+    this.context.setState(new ProcessingState(this.context));
+  }
+}
+
+class ProcessingState extends State {
+  enter() {
+    // perform any setup tasks for the processing state
+  }
+  
+  exit() {
+    // perform any cleanup tasks for the processing state
+  }
+  
+  update() {
+    // perform any logic needed while in the processing state
+    // transition to the idle state when processing is complete
+    this.context.setState(new IdleState(this.context));
+  }
+}
+
+class IdleState extends State {
+  enter() {
+    // perform any setup tasks for the idle state
+  }
+  
+  exit() {
+    // perform any cleanup tasks for the idle state
+  }
+  
+  update() {
+    // perform any logic needed while in the idle state
+    // transition to the walking state when ready to start processing again
+    this.context.setState(new WalkingState(this.context));
+  }
+}
+class Context {
+  constructor() {
+    this.currentState = new WalkingState(this);
+  }
+  
+  setState(state) {
+    this.currentState.exit();
+    this.currentState = state;
+    this.currentState.enter();
+  }
+  
+  update() {
+    this.currentState.update();
+  }
+}
