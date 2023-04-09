@@ -6,7 +6,7 @@ const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
 const window = PBotUtils.PBotWindow(ui, "StoneDigger", 50, 110, ScriptID);
 const btnStart = window.addButton("btnStartClick", "Start", 30, 35, 30);
 let stop;
-let stockpileName = 'gfx/terobjs/stockpile-clay';
+let stockpileName = 'gfx/terobjs/stockpile-stone';
 let stone = "Basalt";
 
 
@@ -72,8 +72,8 @@ const main = () => {
 		while(!stop && !window.closed() && PBotUtils.playerInventory(ui).freeSlotsInv() > 5){
 			if(PBotCharacterAPI.getStamina(ui) < 90)
 				PBotUtils.drink(ui, true);
-			if(PBotCharacterAPI.getEnergy(ui) < 40){
-				PBotUtils.sysMsg(ui, "Not Enough Energy! (70+)");
+			if(PBotCharacterAPI.getEnergy(ui) < 22){
+				PBotUtils.sysMsg(ui, "Not Enough Energy! (22+)");
 				stop = true;
 				break;
 			}
