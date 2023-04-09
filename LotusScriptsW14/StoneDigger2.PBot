@@ -1,0 +1,187 @@
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotCharacterAPI = Java.type('haven.purus.pbot.PBotCharacterAPI');
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+
+////////////////
+windowWidth = 100;
+windowHeight = 200;
+const window = PBotUtils.PBotWindow(ui, "StateMan 2", windowWidth, windowHeight, ScriptID);
+const btnStart = window.addButton("btnStartClick", "Start", 70, windowWidth-35, 70);
+const btnStartClick = () => {
+	stop = false;
+	btnStart.hide();
+	main();
+	btnStart.show();
+}
+///////////////
+const tick = 500;
+let stop;
+const shouldStop = () => {
+	return stop || window.closed();
+};
+const main = () => {
+	if (!stop && !window.closed()) {
+	  const context = new Context();
+	  while (!shouldStop()) {
+	    context.update();
+	  }
+	PBotUtils.sysMsg(ui, "done!");
+};
+
+}
+function waitForIdle() {
+  const maxWaitTICKs = 4;
+  const TICK = 200;
+  let idleCounter = maxWaitTICKs;
+  while (idleCounter >= 0) {
+    if (PBotUtils.getHourglass(ui) == -1)
+      idleCounter--;
+    else {
+      idleCounter = maxWaitTICKs;
+    }
+    PBotUtils.sleep(TICK);
+  }
+}
+class State {
+  constructor(context) {
+    this.context = context;
+  }
+
+  enter() {}
+  
+  exit() { }
+  
+  update() {}
+
+}
+class Context {
+  constructor() {
+    this.currentState = new ProcessingState(this);
+    // add window labels
+    this.statusLbl = window.addLabel("Initializing...", 10, 10);
+    this.progressLbl = window.addLabel("", 10, 25);
+    this.estLbl = window.addLabel("Estimated time:", 10, 40);
+    this.timeLbl = window.addLabel("00", 10, 60);
+    this.devider = window.addLabel("_______________", 25, 65);
+  }
+  
+  setState(state) {
+  	// perform any cleanup tasks for the processing state
+  	PBotUtils.sysMsg(ui, "exit " + this.currentState.constructor.name + "! (waiting " + 25 + "ms)" );
+    PBotUtils.sleep(25);
+    this.currentState.exit();
+    this.currentState = state;
+    this.currentState.enter();
+
+  }
+  
+  update() {
+    this.currentState.update();
+    // update window labels
+    this.statusLbl.settext("Current state: " + this.currentState.constructor.name);
+    this.progressLbl.settext("Progress: " + this.progress);
+    this.timeLbl.settext(this.formatTime(this.elapsedTime) + " / " + this.formatTime(this.estimatedTime));
+  }
+  
+  formatTime(milliseconds) {
+    // helper function to format time in mm:ss format
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const secondsRemainder = seconds % 60;
+    return minutes.toString().padStart(2, "0") + ":" + secondsRemainder.toString().padStart(2, "0");
+  }
+}
+
+class ProcessingState extends State {
+
+  update() {
+    // perform any logic needed while in the processing state
+    // transition to the idle state when processing is complete
+		const playerSpeed = PBotCharacterAPI.getSpeed(ui);
+		const playerIsMoving = PBotGobAPI.player(ui).isMoving();
+
+		if (playerIsMoving) {
+			if (playerSpeed >= 3) {
+				this.context.setState(new RunningState(this.context));
+				PBotUtils.sysMsg(ui, "Setting state to running" );
+			}
+			else{
+				PBotUtils.sysMsg(ui, "Setting state to walking (" + playerSpeed + ")" );
+		  		this.context.setState(new WalkingState(this.context));
+			}
+		} else 
+		 	this.context.setState(new IdleState(this.context));
+  }
+}
+
+class IdleState extends State {
+  enter() {
+    // perform any setup tasks for the idle state
+  }
+  
+  exit() {
+    // perform any cleanup tasks for the idle state
+  }
+  
+  update() {
+    // perform any logic needed while in the idle state
+    // transition to the walking state when ready to start processing again
+    this.context.setState(new ProcessingState(this.context));
+    waitForIdle();
+  }
+}
+class WalkingState extends State {
+  enter() {
+    // perform any setup tasks for the walking state
+  }
+  
+  exit() {
+    // perform any cleanup tasks for the walking state
+  }
+  update() {
+	const playerIsMoving = PBotGobAPI.player(ui).isMoving();
+	const playerSpeed = PBotCharacterAPI.getSpeed(ui);
+    if (playerIsMoving && playerSpeed < 3)  {
+    	//Keep Walking
+    } else 
+    	this.context.setState(new ProcessingState(this.context));
+  }
+}
+class WalkingState extends State {
+  enter() {
+    // perform any setup tasks for the walking state
+  }
+  
+  exit() {
+    // perform any cleanup tasks for the walking state
+  }
+  update() {
+	const playerIsMoving = PBotGobAPI.player(ui).isMoving();
+	const playerSpeed = PBotCharacterAPI.getSpeed(ui);
+    if (playerIsMoving && playerSpeed < 3)  {
+    	//Keep Walking
+    } else 
+    	this.context.setState(new ProcessingState(this.context));
+  }
+}
+class RunningState extends State {
+  enter() {
+    // perform any setup tasks for the running state
+  }
+  
+  exit() {
+    // perform any cleanup tasks for the running state
+  }
+  
+  update() {
+	const playerIsMoving = PBotGobAPI.player(ui).isMoving();
+	const playerSpeed = PBotCharacterAPI.getSpeed(ui);
+    if (playerIsMoving && playerSpeed >= 3)  {
+    	//Keep Running
+    } else 
+    	this.context.setState(new ProcessingState(this.context));
+  }
+}
+
+
