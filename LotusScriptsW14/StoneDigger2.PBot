@@ -2,7 +2,9 @@ const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
 const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
 const PBotCharacterAPI = Java.type('haven.purus.pbot.PBotCharacterAPI');
 const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
-
+stone = "Basalt";
+		let stoneTiles = [];
+		let stockPiles = [];	
 ////////////////
 windowWidth = 100;
 windowHeight = 200;
@@ -22,14 +24,19 @@ const shouldStop = () => {
 };
 const main = () => {
 	if (!stop && !window.closed()) {
-	  const context = new Context();
-	  while (!shouldStop()) {
-	    context.update();
-	  }
+		timeStartOfBot = Date.now();
+		const context = new Context();
+		let stop = false;
+		let stoneStored = 0
+		let stoneInvAmount = PBotUtils.playerInventory(ui).getInventoryItemsByNames(stone).size();
+
+		while (!shouldStop()) {
+			context.update();
+		}
+	}
 	PBotUtils.sysMsg(ui, "done!");
 };
 
-}
 function waitForIdle() {
   const maxWaitTICKs = 4;
   const TICK = 200;
@@ -43,18 +50,16 @@ function waitForIdle() {
     PBotUtils.sleep(TICK);
   }
 }
-class State {
-  constructor(context) {
-    this.context = context;
-  }
-
-  enter() {}
-  
-  exit() { }
-  
-  update() {}
-
+function dig (tiles){
+	PBotUtils.pfLeftClick(ui, tiles[0].x, tiles[0].y);
+	PBotCharacterAPI.doAct(ui, "dig");
+	PBotUtils.mapClick(ui, tiles[0].x, tiles[0].y, 1, 0);
+	PBotCharacterAPI.cancelAct(ui);
+	if(!PBotUtils.getHourglass(ui) >= 0) {
+		PBotUtils.waitForHourglass(ui);
+	}
 }
+
 class Context {
   constructor() {
     this.currentState = new ProcessingState(this);
@@ -77,10 +82,12 @@ class Context {
   }
   
   update() {
+  	this.elapsedTime = Date.now() - timeStartOfBot;
+  	this.estimatedTime = this.elapsedTime * 2;
     this.currentState.update();
     // update window labels
-    this.statusLbl.settext("Current state: " + this.currentState.constructor.name);
-    this.progressLbl.settext("Progress: " + this.progress);
+    this.statusLbl.settext("Current state:" + this.currentState.constructor.name);
+    this.progressLbl.settext("Progress: " + this.elapsedTime);
     this.timeLbl.settext(this.formatTime(this.elapsedTime) + " / " + this.formatTime(this.estimatedTime));
   }
   
@@ -92,7 +99,18 @@ class Context {
     return minutes.toString().padStart(2, "0") + ":" + secondsRemainder.toString().padStart(2, "0");
   }
 }
+class State {
+  constructor(context) {
+    this.context = context;
+  }
 
+  enter() {
+  }
+  
+  exit() { }
+  
+  update() {}
+}
 class ProcessingState extends State {
 
   update() {
@@ -100,7 +118,6 @@ class ProcessingState extends State {
     // transition to the idle state when processing is complete
 		const playerSpeed = PBotCharacterAPI.getSpeed(ui);
 		const playerIsMoving = PBotGobAPI.player(ui).isMoving();
-
 		if (playerIsMoving) {
 			if (playerSpeed >= 3) {
 				this.context.setState(new RunningState(this.context));
@@ -110,11 +127,55 @@ class ProcessingState extends State {
 				PBotUtils.sysMsg(ui, "Setting state to walking (" + playerSpeed + ")" );
 		  		this.context.setState(new WalkingState(this.context));
 			}
-		} else 
+		}
+
+		if (stoneTiles.length <= 0){
+    		PBotUtils.sysMsg(ui, "Starting Setup: ");
+    		this.context.setState(new SetupState(this.context));
+    	}
+
+		 else 
 		 	this.context.setState(new IdleState(this.context));
   }
 }
+class SetupState extends State {
+	enter() {
+		PBotUtils.sysMsg(ui, "InSetupState");
+	}
 
+	exit() {
+	// perform any cleanup tasks for the idle state
+	}
+
+	update() {
+		PBotUtils.sysMsg(ui, "InSetupState update");
+		if (stoneTiles.length === 0){
+			stoneTiles = this.selectTiles();
+		}
+		this.context.setState(new ProcessingState(this.context));
+	}
+
+	selectTiles(){
+		let stoneTiles = [];
+		PBotUtils.sysMsg(ui, "Select area to dig stones from!");
+		PBotUtils.selectArea(ui);
+		const aCoordDig = PBotUtils.getSelectedAreaA();
+		const bCoordDig = PBotUtils.getSelectedAreaB();
+		const maxX = Math.max(aCoordDig.x, bCoordDig.x);
+		const minX = Math.min(aCoordDig.x, bCoordDig.x);
+		const maxY = Math.max(aCoordDig.y, bCoordDig.y);
+		const minY = Math.min(aCoordDig.y, bCoordDig.y);
+		console.log(maxX + " ja " + minX + " JA " + maxY + " ja " + minY);
+		for(let i=minY; i<maxY; i += 11) {
+			for(let j=minX; j<maxX; j += 11) {
+				if(PBotUtils.tileResnameAt(ui, j, i) === "gfx/tiles/mountain") {
+					stoneTiles.push({x: j, y: i});
+				}
+			}
+		}
+		return stoneTiles;
+	}
+}
 class IdleState extends State {
   enter() {
     // perform any setup tasks for the idle state
@@ -129,23 +190,6 @@ class IdleState extends State {
     // transition to the walking state when ready to start processing again
     this.context.setState(new ProcessingState(this.context));
     waitForIdle();
-  }
-}
-class WalkingState extends State {
-  enter() {
-    // perform any setup tasks for the walking state
-  }
-  
-  exit() {
-    // perform any cleanup tasks for the walking state
-  }
-  update() {
-	const playerIsMoving = PBotGobAPI.player(ui).isMoving();
-	const playerSpeed = PBotCharacterAPI.getSpeed(ui);
-    if (playerIsMoving && playerSpeed < 3)  {
-    	//Keep Walking
-    } else 
-    	this.context.setState(new ProcessingState(this.context));
   }
 }
 class WalkingState extends State {
@@ -183,5 +227,41 @@ class RunningState extends State {
     	this.context.setState(new ProcessingState(this.context));
   }
 }
+class PFState extends State {
+	enter() {
+		PBotUtils.sysMsg(ui, "Starting PFState");
+	}
+
+	exit() {
+		// perform any cleanup tasks for the running state
+	}
+
+	update() {
+		const playerIsMoving = PBotGobAPI.player(ui).isMoving();
+		const playerSpeed = PBotCharacterAPI.getSpeed(ui);
+		if (playerIsMoving && playerSpeed >= 3)  {
+			//Keep Running
+		} else 
+			this.context.setState(new ProcessingState(this.context));
+	}
+}
+class DiggingState extends State {
+	enter() {
+		    PBotUtils.sysMsg(ui, "Starting Digging State");
+	}
+
+	exit() {
+	// perform any cleanup tasks for the running state
+	}
+
+	update() {
+	if(PBotUtils.getHourglass(ui) >= 0)  {
+		//Keep Digging
+	} else 
+		this.context.setState(new ProcessingState(this.context));
+	}
+}
+
+
 
 
