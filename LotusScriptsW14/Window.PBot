@@ -1,0 +1,166 @@
+// Fills troughs with crops
+// Made by Purus Cor to demonstrate usage of PBot API
+// For more information about API, join Purus Pasta discord
+// To suggest features into API, suggest them in discord
+const PBot = Java.type("haven.purus.pbot.PBotAPI");
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
+
+let stop;
+const radius = 200;
+windowWidth = 170;
+windowHeight = 140;
+const window = PBotUtils.PBotWindow("MeatFactory", windowWidth, windowHeight, ScriptID);
+const radiusLabel = window.addLabel("Search Radius: ", 10, 10);
+const devider = window.addLabel("_______________", 25, 30);
+const textEntry = window.addTextEntry(35, radius.toString(), 90, 5);
+const cboxSkin = window.addCheckbox("checkboxSkin", "Skin all animals", false, 10, 50);
+const cboxClean = window.addCheckbox("checkboxClean", "Clean all animals", false, 10, 70);
+const cboxButcher = window.addCheckbox("checkboxButcher", "Butcher all animals", false, 10, 90);
+const cboxBones = window.addCheckbox("checkboxBones", "Collect Bones", false, 10, 110);
+window.addLabel("_______________", 20, 120);
+const btnStart = window.addButton("btnStartClick", "Start", 70, 35, 145);
+
+
+//Adding default values
+cboxSkin.setValue(true);
+cboxClean.setValue(true);
+cboxButcher.setValue(true);
+cboxBones.setValue(true);
+
+
+const btnStartClick = () => {
+	stop = false;
+	radiusLabel.destroy();
+	devider.destroy();
+	btnStart.destroy();
+	textEntry.destroy();
+	cboxSkin.destroy();
+	cboxClean.destroy();
+	cboxButcher.destroy();
+	cboxBones.destroy();
+
+	const infoRadius = window.addLabel("Auto Add Sto: " + radius, 10, 20);
+	const infoSkin = window.addLabel("Water From Nearest Barrel: " + cboxSkin.getValue(), 10, 55);
+	const infoClean = window.addLabel("Auto Add Relevant Stockpiles: " + cboxClean.getValue(), 10, 65);
+	const infoButcher = window.addLabel("Butcher: " + cboxButcher.getValue(), 10, 75);
+	const infoBones = window.addLabel("Bones: " + cboxBones.getValue(), 10, 85);
+	main();
+}
+const main = () => {
+	do {
+		let gob = returnAnimal(radius);
+		if(gob == null) {
+			PBotUtils.sysMsg("Found no animals");
+			window.closeWindow();
+			stop = true;
+			break;
+		}
+		const target = window.addLabel(gob.getResname().toString(), 10, 10);
+		const targetDistance = window.addLabel("Distance: " + Math.floor(distanceToGob(gob)), 10, 30);
+		const status = window.addLabel("Pathfinding", 40, 135);
+
+		pfToGob(gob);
+		status.destroy();
+
+		if (cboxSkin.getValue()) {
+			gob.doClick(3, 0);
+			PBotUtils.waitForFlowerMenu();
+			if(PBotUtils.choosePetal("Skin")) {
+				const status = window.addLabel("status: Skinning", 20, 135);
+				PBotUtils.sysMsg("Going to Skin");
+				PBotUtils.waitForHourglass(500);
+				PBotUtils.dropItemFromHand(0);
+				status.destroy();
+			}
+		}
+		if (cboxClean.getValue()) {
+			gob.doClick(3, 0);
+			PBotUtils.waitForFlowerMenu();
+			if(PBotUtils.choosePetal("Clean")) {
+				const status = window.addLabel("status: Cleaning", 20, 135);
+				PBotUtils.sysMsg("Going to Clean");
+				PBotUtils.waitForHourglass(500);
+				PBotUtils.dropItemFromHand(0);
+				status.destroy();
+			}
+		}
+		if (cboxButcher.getValue()) {
+			gob.doClick(3, 0);
+			PBotUtils.waitForFlowerMenu();
+			if(PBotUtils.choosePetal("Butcher")) {
+				const status = window.addLabel("status: Butchering", 20, 135);
+				PBotUtils.sysMsg("Going to Butcher");
+				PBotUtils.waitForHourglass();
+				PBotUtils.dropItemFromHand(500);
+				status.destroy();
+			}
+		}
+		if (cboxBones.getValue()) {
+			gob.doClick(3, 0);
+			PBotUtils.waitForFlowerMenu();
+			if(PBotUtils.choosePetal("Collect bones")) {
+				const status = window.addLabel("status: Collecting Bones", 40, 135);
+				PBotUtils.sysMsg("Going to Collect bones");
+				PBotUtils.waitForHourglass(500);
+				PBotUtils.dropItemFromHand(0);
+				status.destroy();
+			}
+		}
+
+
+		PBotUtils.sysMsg("Close the window to stop");
+		PBotUtils.sysMsg("Waiting 1000ms");
+		PBotUtils.sleep(1000);
+		target.destroy();
+		targetDistance.destroy();
+	} while (!stop && !window.closed());
+	PBotUtils.sysMsg("MeatFactory finished!");
+};
+
+function pfToGob(gob){
+	// wait for player to start moving, then for player to stop
+	do {
+		if(!PBotGobAPI.player().isMoving()){ //Standing still
+			if (!gob.pfClick(1, 0)) {
+				PBotUtils.sysMsg("Cant find a way to path to the object");
+			}
+			PBotUtils.sleep(300);
+		}
+		if(PBotGobAPI.player().isMoving()){
+			PBotUtils.sysMsg("movin' I am waiting 300ms");
+			PBotUtils.sleep(300);
+		}
+	} while (distanceToGob > 11);
+}
+function distanceToGob(gob){
+	const gobPos = gob.getRcCoords().floor();
+	const playerPos = PBotGobAPI.player().getRcCoords().floor();
+	const distanceX = gobPos.x - playerPos.x;
+	const distanceY = gobPos.y - playerPos.y;
+	const total =  pythagorean(distanceX, distanceY);
+	return total;
+}
+function pythagorean(sideA, sideB){
+  return Math.sqrt(Math.pow(sideA, 2) + Math.pow(sideB, 2));
+}
+function returnAnimal(radius) {
+let animalGobs = new Array('gfx/kritter/boar/boar', 'gfx/kritter/wolverine/wolverine',
+'gfx/kritter/otter/otter', 'gfx/kritter/cattle/cattle', 'gfx/kritter/fox/fox',
+'gfx/kritter/reddeer/reddeer', 'gfx/kritter/beaver/beaver', 'gfx/kritter/badger/badger',
+'gfx/kritter/sheep/sheep');
+for (var i = 0; i < animalGobs.length; i++) {
+		let gob = PBotGobAPI.findGobByNames(radius, animalGobs[i]);
+		if (gob) {
+			return gob;
+		}
+	}
+}
+function createInfoWindow(gob) {
+}
+
+function checkboxSkin(){}
+function checkboxClean(){}
+function checkboxButcher(){}
+function checkboxBones(){}

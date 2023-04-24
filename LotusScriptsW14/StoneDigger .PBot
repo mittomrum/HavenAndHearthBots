@@ -52,6 +52,7 @@ function dig (tiles){
 }
 
 
+
 const main = () => {
 	let stop = false;
 	let stoneStored = 0
@@ -78,10 +79,20 @@ const main = () => {
 				break;
 			}
 
-			dig(stoneTiles);
-            PBotUtils.sleep(200);
+			let invFreeAmount = PBotUtils.playerInventory(ui).freeSlotsInv();
+			for (var reatempts = 10; reatempts > 0; reatempts--) {
+				if (invFreeAmount > 5) break;
+				PBotCharacterAPI.doAct(ui, "dig");
+				PBotUtils.mapClick(ui, stoneTiles[0].x, stoneTiles[0].y, 1, 0);
+				PBotCharacterAPI.cancelAct(ui);
+				while(PBotUtils.getHourglass(ui) >= 0 && invFreeAmount > 5){
+					invFreeAmount = PBotUtils.playerInventory(ui).freeSlotsInv();
+					PBotUtils.sleep(200);
+				}
+			}
+			
             PBotUtils.drink(ui, true);
-            
+            PBotUtils.sleep(200);
 			PBotUtils.dropItemFromHand(ui, 100);
 			PBotUtils.sleep(200);
 		}
