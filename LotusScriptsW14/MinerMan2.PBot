@@ -1,0 +1,68 @@
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotCharacterAPI = Java.type("haven.purus.pbot.PBotCharacterAPI");
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
+const window = PBotUtils.PBotWindow(ui, "StoneMan", 50, 110, ScriptID);
+const btnStart = window.addButton("btnStartClick", "Start", 30, 35, 30);
+
+
+// Define global variables
+var inv = PBotUtils.playerInventory(ui);
+var caveTiles = [];
+
+const tick = 500;
+let stop;
+const shouldStop = () => {
+	return stop || window.closed();
+};
+const main = () => {
+  if (!stop && !window.closed()) {
+    while (!shouldStop()) {
+      caveTiles = selectTiles();
+      for (var i = caveTiles.length - 1; i >= 0; i--) {
+        PBotUtils.sysMsg(ui, "Tile : " + i + " " + PBotUtils.tileResnameAt(ui, caveTiles[i].x, caveTiles[i].x));
+        if (PBotUtils.pfLeftClick(ui, caveTiles[i].x, caveTiles[i].y)){
+          PBotUtils.sysMsg(ui, "Can Walk!", 55, 225, 61);
+          PBotUtils.mapClick(ui, caveTiles[i].x, caveTiles[i].y, 1, 0);
+        } else {
+          PBotUtils.sysMsg(ui, "Cant Walk!", 255, 225, 61);
+          PBotCharacterAPI.doAct(ui, "mine");
+          PBotUtils.itemact(ui, caveTiles[i].x, caveTiles[i].y, 0);
+          PBotUtils.sleep(tick);
+        }
+      }
+
+
+      PBotUtils.sysMsg(ui, "Update Loop!", 155, 225, 161);
+      PBotUtils.sleep(tick);
+	  }	 
+	}
+	PBotUtils.sysMsg(ui, "MineMan; Bot done!", 255, 25, 61);
+};
+
+
+function selectTiles(){
+    let caveTiles = [];
+    PBotUtils.sysMsg(ui, "Select area to mine from!");
+    PBotUtils.selectArea(ui);
+    const aCoordDig = PBotUtils.getSelectedAreaA();
+    const bCoordDig = PBotUtils.getSelectedAreaB();
+    const maxX = Math.max(aCoordDig.x, bCoordDig.x);
+    const minX = Math.min(aCoordDig.x, bCoordDig.x);
+    const maxY = Math.max(aCoordDig.y, bCoordDig.y);
+    const minY = Math.min(aCoordDig.y, bCoordDig.y);
+    PBotUtils.sysMsg(ui, maxX + " ja " + minX + " JA " + maxY + " ja " + minY);
+    for(let i=minY; i<maxY; i += 11) {
+      for(let j=minX; j<maxX; j += 11) {
+        if(PBotUtils.tileResnameAt(ui, j, i) === "gfx/tiles/cave") {
+          caveTiles.push({x: j, y: i});
+        }
+      }
+    }
+    return caveTiles;
+  }
+function btnStartClick(){
+	btnStart.destroy();
+	main();
+}

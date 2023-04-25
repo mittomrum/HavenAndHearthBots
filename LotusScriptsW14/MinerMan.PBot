@@ -8,11 +8,8 @@ const btnStart = window.addButton("btnStartClick", "Start", 30, 35, 30);
 
 
 // Define global variables
-let stockpileName = 'gfx/terobjs/stockpile-stone';
-let stone = "Basalt";
 var inv = PBotUtils.playerInventory(ui);
-var stoneTiles = [];
-var stockPiles = [];
+var caveTiles = [];
 
 const tick = 500;
 let stop;
@@ -24,7 +21,9 @@ const main = () => {
 	  const context = new Context();
 	  while (!shouldStop()) {
 	    context.update();
-	  }	
+      PBotUtils.sysMsg(ui, "Update Loop!", 155, 225, 161);
+      PBotUtils.sleep(tick);
+	  }	 
 	}
 	PBotUtils.sysMsg(ui, "done!");
 };
@@ -35,7 +34,7 @@ function btnStartClick(){
 
 class Context {
   constructor() {
-    this.currentState = new ProcessingState(this);
+    this.currentState = new SetupState(this);
     // add window labels
     this.statusLbl = window.addLabel("Initializing...", 10, 10);
     this.progressLbl = window.addLabel("", 10, 25);
@@ -46,7 +45,7 @@ class Context {
   
   setState(state) {
   	// perform any cleanup tasks for the processing state
-  	PBotUtils.sysMsg(ui, "exit " + this.currentState.constructor.name + "! (waiting " + 25 + "ms)" );
+  	PBotUtils.sysMsg(ui, "exit " + this.currentState.constructor.name + "! (waiting " + 25 + "ms)", 155, 125, 121);
     PBotUtils.sleep(25);
     this.currentState.exit();
     this.currentState = state;
@@ -75,49 +74,29 @@ class State {
   constructor(context) {
     this.context = context;
   }
-
   enter() {}
   exit() {}
   update() {}
 }
-class ProcessingState extends State {
 
-  update() {
-    if (stoneTiles.length === 0) {
-      this.context.setState(new SetupState(this.context));
-      return;
-    }
-
-    // perform any logic needed while in the processing state
-    // transition to the idle state when processing is complete
-    if (PBotGobAPI.player(ui).isMoving()) {
-      this.context.setState(new WalkingState(this.context));
-    }
-    if (inv.freeSlotsInv() > 5 && stoneTiles.length > 0) {
-      this.context.setState(new DiggingState(this.context));
-    } else {
-      PBotUtils.sysMsg(ui, "Failed to enter digging state..");
-      this.context.setState(new IdleState(this.context));
-    }
-  }
-}
 class SetupState extends State {
   enter() {
     PBotUtils.sysMsg(ui, "Starting Setup");
-    // Find and store all stone tiles and stockpiles
-    stoneTiles = this.selectTiles();
-    stockPiles = this.selectStockpiles();
+    caveTiles = this.selectTiles();
   }
   update() {
     // Transition to idle state once setup is complete
-    if (stoneTiles.length > 0 && stockPiles.length > 0) {
-      PBotUtils.sysMsg(ui, "Setup complete");
+    if (caveTiles.length > 0) {
+      PBotUtils.sysMsg(ui, "Cave Tiles Added: "  + caveTiles.length);
       this.context.setState(new IdleState(this.context));
+    } else {
+      PBotUtils.sysMsg(ui, "Starting Setup");
+      caveTiles = this.selectTiles();
     }
   }
 	selectTiles(){
-		let stoneTiles = [];
-		PBotUtils.sysMsg(ui, "Select area to dig stones from!");
+		let caveTiles = [];
+		PBotUtils.sysMsg(ui, "Select area to mine from!");
 		PBotUtils.selectArea(ui);
 		const aCoordDig = PBotUtils.getSelectedAreaA();
 		const bCoordDig = PBotUtils.getSelectedAreaB();
@@ -128,36 +107,50 @@ class SetupState extends State {
 		PBotUtils.sysMsg(ui, maxX + " ja " + minX + " JA " + maxY + " ja " + minY);
 		for(let i=minY; i<maxY; i += 11) {
 			for(let j=minX; j<maxX; j += 11) {
-				if(PBotUtils.tileResnameAt(ui, j, i) === "gfx/tiles/mountain") {
-					stoneTiles.push({x: j, y: i});
+				if(PBotUtils.tileResnameAt(ui, j, i) === "gfx/tiles/cave") {
+					caveTiles.push({x: j, y: i});
 				}
 			}
 		}
-		return stoneTiles;
-	}
-	selectStockpiles(){
-		let stockpiles = [];
-		PBotUtils.sysMsg(ui, "Select area with stockpiles!");
-		PBotUtils.selectArea(ui);
-		const gobs = PBotUtils.gobsInArea(ui, PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
-		for(let i=0; i<gobs.size(); i++) {
-			if(gobs[i].getResname() === stockpileName)
-				stockpiles.push(gobs[i]);
-			}
-		return stockpiles;
+		return caveTiles;
 	}
 }
 class IdleState extends State {
   update() {
-    // Check inventory space and start digging if possible
-    if (inv.freeSlotsInv() > 5 && stoneTiles.length > 0) {
-      this.context.setState(new DiggingState(this.context));
-    } else {
-    	PBotUtils.sleep(1500);
-    	this.context.setState(new ProcessingState(this.context));
+    if(PBotCharacterAPI.getStamina(ui) < 90)
+        PBotUtils.drink(ui, true);
+    if(PBotCharacterAPI.getEnergy(ui) < 22){
+        PBotUtils.sysMsg(ui, "Not Enough Energy! (22+)");
+        stop = true;
+    } else if (caveTiles.length > 0) {
+      this.context.setState(new MiningCursorState(this.context));
     }
+      else {
+        PBotUtils.sysMsg(ui, "No More Tiles");
+        stop = true;
+      }
+    }
+  }  
+
+class MiningCursorState extends State {
+  enter() {
+    // perform any setup tasks for the walking state
+    PBotUtils.sysMsg(ui, "Activating the mining cursor");
+  }
+
+  exit() {
+    // perform any cleanup tasks for the walking state
+  }
+
+  update() {
+      PBotCharacterAPI.cancelAct(ui);
+      PBotCharacterAPI.doAct(ui, "mine"); //TODO FIX THIS WITH RETURING CURSOR INSTEAD OF THIS
+      PBotUtils.sleep(tick);
+      this.context.setState(new MiningState(this.context));    
   }
 }
+
+
 class WalkingState extends State {
   enter() {
     // perform any setup tasks for the walking state
@@ -170,13 +163,13 @@ class WalkingState extends State {
     if (PBotGobAPI.player(ui).isMoving())  {
     	PBotUtils.sleep(500);
     } else {
-    	this.context.setState(new ProcessingState(this.context));
+    	this.context.setState(new IdleState(this.context));
     }
   }
 }
-class DiggingState extends State {
+class MiningState extends State {
   enter() {
-    PBotUtils.sysMsg(ui, "Starting to dig");
+    PBotUtils.sysMsg(ui, "Starting to Mine");
     // Set up a timer to update inventory every second
   }
 
@@ -185,26 +178,36 @@ class DiggingState extends State {
   }
 
   update() {
+    for (var i = caveTiles.length - 1; i >= 0; i--) {
+      PBotUtils.sysMsg(ui, "Tile : " + PBotUtils.tileResnameAt(ui, caveTiles[i].x, caveTiles[i].x));
+      PBotUtils.placeThing(ui, caveTiles[i].x, caveTiles[i].y);
+    }
+
+
     // Check if inventory is full or no more stone tiles left to dig
-    if (inv.freeSlotsInv() <= 5 || stoneTiles.length == 0) {
-    PBotUtils.sysMsg(ui, "Digging");
-      this.dig(stoneTiles);
-      this.context.setState(new WalkingToStockpileState(this.context));
+    if (PBotUtils.pfLeftClick(ui, caveTiles[0].x, caveTiles[0].y)) {
+      PBotUtils.sysMsg(ui, "Can Walk To Tile");
+      PBotUtils.pfLeftClick(ui, caveTiles[0].x, caveTiles[0].y);
+      PBotUtils.waitForHourglass(ui, 500);
+      caveTiles.shift();
+      this.context.setState(new IdleState(this.context));
     } else {
-    	this.context.setState(new ProcessingState(this.context));
+      PBotUtils.sysMsg(ui, "Cant Walk To Tile so I should mine");
+      this.mine();
+    	this.context.setState(new IdleState(this.context));
     }
   }
-  	dig (tiles){
-		PBotUtils.pfLeftClick(ui, tiles[0].x, tiles[0].y);
-		PBotCharacterAPI.doAct(ui, "dig");
-		PBotUtils.mapClick(ui, tiles[0].x, tiles[0].y, 1, 0);
-		PBotCharacterAPI.cancelAct(ui);
+
+  	mine (tiles){
+    PBotCharacterAPI.doAct(ui, "mine");
+    PBotUtils.mapClick(ui, caveTiles[0].x, caveTiles[0].y, 1, 0);
+    PBotCharacterAPI.cancelAct(ui);
 		if(!PBotUtils.getHourglass(ui) >= 0) {
-			PBotUtils.waitForHourglass(ui);
+			PBotUtils.waitForHourglass(ui, 500);
 		}
 	}
 }
-class WalkingToStoneTileState extends State {
+class WalkingTocaveTilestate extends State {
   enter() {
     PBotUtils.sysMsg(ui, "Walking to stone tile");
     // Find the closest stone tile and walk to it
@@ -213,7 +216,7 @@ class WalkingToStoneTileState extends State {
     if (PBotGobAPI.player(ui).isMoving())  {
     	PBotUtils.sleep(5000);
     } else {
-    	this.context.setState(new ProcessingState(this.context));
+    	this.context.setState(new IdleState(this.context));
     }
   }
 }
