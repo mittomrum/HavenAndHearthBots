@@ -1,0 +1,223 @@
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotCharacterAPI = Java.type("haven.purus.pbot.PBotCharacterAPI");
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
+const window = PBotUtils.PBotWindow(ui, "StoneDigger 2 ", 50, 110, ScriptID);
+const btnStart = window.addButton("btnStartClick", "Start", 30, 35, 30);
+
+
+// Define global variables
+let stockpileName = 'gfx/terobjs/stockpile-stone';
+let stone = "Basalt";
+var inv = PBotUtils.playerInventory(ui);
+var stoneTiles = [];
+var stockPiles = [];
+
+const tick = 500;
+let stop;
+const shouldStop = () => {
+	return stop || window.closed();
+};
+const main = () => {
+	if (!stop && !window.closed()) {
+	  const context = new Context();
+	  while (!shouldStop()) {
+	    context.update();
+	  }	
+	}
+	PBotUtils.sysMsg(ui, "done!");
+};
+function btnStartClick(){
+	btnStart.destroy();
+	main();
+}
+
+class Context {
+  constructor() {
+    this.currentState = new ProcessingState(this);
+    // add window labels
+    this.statusLbl = window.addLabel("Initializing...", 10, 10);
+    this.progressLbl = window.addLabel("", 10, 25);
+    this.estLbl = window.addLabel("Estimated time:", 10, 40);
+    this.timeLbl = window.addLabel("00", 10, 60);
+    this.devider = window.addLabel("_______________", 25, 65);
+  }
+  
+  setState(state) {
+  	// perform any cleanup tasks for the processing state
+  	PBotUtils.sysMsg(ui, "exit " + this.currentState.constructor.name + "! (waiting " + 25 + "ms)" );
+    PBotUtils.sleep(25);
+    this.currentState.exit();
+    this.currentState = state;
+    this.currentState.enter();
+  }
+  
+  update() {
+    this.currentState.update();
+    // update window labels
+    this.statusLbl.settext("Current state: " + this.currentState.constructor.name);
+    this.progressLbl.settext("Progress: " + this.progress);
+    this.timeLbl.settext(this.formatTime(this.elapsedTime) + " / " + this.formatTime(this.estimatedTime));
+    
+  }
+  
+  formatTime(milliseconds) {
+    // helper function to format time in mm:ss format
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const secondsRemainder = seconds % 60;
+    return minutes.toString().padStart(2, "0") + ":" + secondsRemainder.toString().padStart(2, "0");
+  }
+}
+// Define State classes
+class State {
+  constructor(context) {
+    this.context = context;
+  }
+
+  enter() {}
+  exit() {}
+  update() {}
+}
+class ProcessingState extends State {
+
+  update() {
+    if (stoneTiles.length === 0) {
+      this.context.setState(new SetupState(this.context));
+      return;
+    }
+
+    // perform any logic needed while in the processing state
+    // transition to the idle state when processing is complete
+    if (PBotGobAPI.player(ui).isMoving()) {
+      this.context.setState(new WalkingState(this.context));
+    }
+    if (inv.freeSlotsInv() > 5 && stoneTiles.length > 0) {
+      this.context.setState(new DiggingState(this.context));
+    } else {
+      PBotUtils.sysMsg(ui, "Failed to enter digging state..");
+      this.context.setState(new IdleState(this.context));
+    }
+  }
+}
+
+
+class SetupState extends State {
+  enter() {
+    PBotUtils.sysMsg(ui, "Starting Setup");
+    // Find and store all stone tiles and stockpiles
+    stoneTiles = this.selectTiles();
+    stockPiles = this.selectStockpiles();
+  }
+  update() {
+    // Transition to idle state once setup is complete
+    if (stoneTiles.length > 0 && stockPiles.length > 0) {
+      PBotUtils.sysMsg(ui, "Setup complete");
+      this.context.setState(new IdleState(this.context));
+    }
+  }
+	selectTiles(){
+		let stoneTiles = [];
+		PBotUtils.sysMsg(ui, "Select area to dig stones from!");
+		PBotUtils.selectArea(ui);
+		const aCoordDig = PBotUtils.getSelectedAreaA();
+		const bCoordDig = PBotUtils.getSelectedAreaB();
+		const maxX = Math.max(aCoordDig.x, bCoordDig.x);
+		const minX = Math.min(aCoordDig.x, bCoordDig.x);
+		const maxY = Math.max(aCoordDig.y, bCoordDig.y);
+		const minY = Math.min(aCoordDig.y, bCoordDig.y);
+		PBotUtils.sysMsg(ui, maxX + " ja " + minX + " JA " + maxY + " ja " + minY);
+		for(let i=minY; i<maxY; i += 11) {
+			for(let j=minX; j<maxX; j += 11) {
+				if(PBotUtils.tileResnameAt(ui, j, i) === "gfx/tiles/mountain") {
+					stoneTiles.push({x: j, y: i});
+				}
+			}
+		}
+		return stoneTiles;
+	}
+	selectStockpiles(){
+		let stockpiles = [];
+		PBotUtils.sysMsg(ui, "Select area with stockpiles!");
+		PBotUtils.selectArea(ui);
+		const gobs = PBotUtils.gobsInArea(ui, PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
+		for(let i=0; i<gobs.size(); i++) {
+			if(gobs[i].getResname() === stockpileName)
+				stockpiles.push(gobs[i]);
+			}
+		return stockpiles;
+	}
+}
+
+class IdleState extends State {
+  update() {
+    // Check inventory space and start digging if possible
+    if (inv.freeSlotsInv() > 5 && stoneTiles.length > 0) {
+      this.context.setState(new DiggingState(this.context));
+    } else {
+    	PBotUtils.sleep(1500);
+    	this.context.setState(new ProcessingState(this.context));
+    }
+  }
+}
+class WalkingState extends State {
+  enter() {
+    // perform any setup tasks for the walking state
+  }
+  
+  exit() {
+    // perform any cleanup tasks for the walking state
+  }
+  update() {
+    if (PBotGobAPI.player(ui).isMoving())  {
+    	PBotUtils.sleep(500);
+    } else {
+    	this.context.setState(new ProcessingState(this.context));
+    }
+  }
+}
+
+class DiggingState extends State {
+  enter() {
+    PBotUtils.sysMsg(ui, "Starting to dig");
+    // Set up a timer to update inventory every second
+  }
+
+  exit() {
+    // Stop the inventory timer when leaving digging state
+  }
+
+  update() {
+    // Check if inventory is full or no more stone tiles left to dig
+    if (inv.freeSlotsInv() <= 5 || stoneTiles.length == 0) {
+    PBotUtils.sysMsg(ui, "Digging");
+      this.dig(stoneTiles);
+      this.context.setState(new WalkingToStockpileState(this.context));
+    } else {
+    	this.context.setState(new ProcessingState(this.context));
+    }
+  }
+  	dig (tiles){
+		PBotUtils.pfLeftClick(ui, tiles[0].x, tiles[0].y);
+		PBotCharacterAPI.doAct(ui, "dig");
+		PBotUtils.mapClick(ui, tiles[0].x, tiles[0].y, 1, 0);
+		PBotCharacterAPI.cancelAct(ui);
+		if(!PBotUtils.getHourglass(ui) >= 0) {
+			PBotUtils.waitForHourglass(ui);
+		}
+	}
+}
+class WalkingToStoneTileState extends State {
+  enter() {
+    PBotUtils.sysMsg(ui, "Walking to stone tile");
+    // Find the closest stone tile and walk to it
+  }
+  update() {
+    if (PBotGobAPI.player(ui).isMoving())  {
+    	PBotUtils.sleep(5000);
+    } else {
+    	this.context.setState(new ProcessingState(this.context));
+    }
+  }
+}
