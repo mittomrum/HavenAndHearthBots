@@ -111,14 +111,19 @@ class IdleState extends State {
   constructor(context) {
     super(context);
     this.startTime = null;
-    this.duration = 10000;
+    this.duration = 2000;
     this.numDots = 1;
+    this.retries = 0;
   }
 
   enter() {
     PBotUtils.sysMsg(ui, "|IdleState|", 25, 166, 231);
     this.startTime = Date.now();
-    this.activity = "|IdleState|"
+    this.activity = " ";
+  }
+  exit(){
+    this.context.progressLbl.settext(` `);
+    this.context.estLbl.settext(` `);
   }
 
   update() {
@@ -128,15 +133,19 @@ class IdleState extends State {
       this.context.setState(new ProcessingState(this.context));
       return;
     } else {
-      this.activity = "Idle .."
+      this.activity = "Idle ..";
       PBotUtils.sysMsg(ui, "|Standing|", 25, 166, 231);
       PBotUtils.sleep(200);
     }
 
     const elapsed = Date.now() - this.startTime;
     if (elapsed >= this.duration) {
-      this.context.setState(new ProcessingState(this.context));
-      return;
+      this.retries++;
+      if (this.retries >= 3) {
+        this.context.setState(new ProcessingState(this.context));
+      } else {
+        this.startTime = Date.now();
+      }
     }
     PBotUtils.sleep(50);
   }
@@ -149,10 +158,8 @@ class IdleState extends State {
     this.context.progressLbl.settext(`Progress: ${progressBar}`);
     this.context.activity.settext(this.activity);
 
-    const remainingTime = this.duration - elapsed;
-    if (remainingTime > 0) {
-      this.context.estLbl.settext(`Estimated time: ${this.context.formatTime(remainingTime)}`);
-    }
+    const retriesLeft = 3 - this.retries;
+    this.context.estLbl.settext(`Retries left: ${retriesLeft}`);
   }
 }
 
@@ -160,25 +167,111 @@ class WalkingState extends State {
   constructor(context) {
     super(context);
     this.startTime = null;
-    this.numDots = 1;
+    this.duration = 5000;
+    this.numDots = 1;    
+    this.retries = 0;
   }
 
   enter() {
     PBotUtils.sysMsg(ui, "|WalkingState|", 25, 166, 231);
     this.startTime = Date.now();
-    this.activity = "|WalkingState|"
+    this.activity = " "
   }
 
   update() {
     this.updateLabels();
 
+
+
+    const playerPos = PBotGobAPI.player(ui).getRcCoords().floor();
+    PBotUtils.sysMsg(ui, "|playerPos.x|" + playerPos.x, 25, 166, 231);
+
+    
+
     if (!PBotGobAPI.player(ui).isMoving()) {
       this.context.setState(new ProcessingState(this.context));
       return;
     } else {
+      this.activity = "Walking ..";
       PBotUtils.sysMsg(ui, "|Walking|", 25, 166, 231);
-      this.activity = "Walking .."
       PBotUtils.sleep(200);
+    }
+
+
+
+
+
+    const elapsed = Date.now() - this.startTime;
+    if (elapsed >= this.duration) {
+      this.retries++;
+      if (this.retries >= 3) {
+        this.context.setState(new ProcessingState(this.context));
+      } else {
+        this.startTime = Date.now();
+      }
+    }
+
+
+    PBotUtils.sleep(50);
+  }
+
+  updateLabels() {
+    const elapsed = Date.now() - this.startTime;
+    const progress = Math.min(elapsed / this.duration, 1);
+    const numDots = Math.floor(progress * 10);
+    const progressBar = ">".repeat(numDots);
+    this.context.progressLbl.settext(`Progress: ${progressBar}`);
+    this.context.activity.settext(this.activity);
+
+    const retriesLeft = 3 - this.retries;
+    this.context.estLbl.settext(`Retries left: ${retriesLeft}`);
+  }
+}
+
+
+class ScanAreaState extends State {
+  constructor(context) {
+    super(context);
+    this.startTime = null;
+    this.duration = 5000;
+    this.numDots = 1;    
+    this.retries = 0;
+  }
+
+  enter() {
+    PBotUtils.sysMsg(ui, "|ScanAreaState|", 25, 166, 231);
+    this.startTime = Date.now();
+    this.activity = " "
+  }
+
+  update() {
+    this.updateLabels();
+
+    var aGameObjects = [];
+    const playerPos = PBotGobAPI.player().getRcCoords().floor();
+    PBotUtils.sysMsg(ui, "|playerPos.x|" + playerPos.x, 25, 166, 231);
+
+    if (aGameObjects.length > 0) {
+      this.context.setState(new ProcessingState(this.context));
+      return;
+    } else {
+      this.activity = "Selecting Objects ..";
+      PBotUtils.sysMsg(ui, "|ScanAreaState|", 25, 166, 231);
+      PBotUtils.sleep(200);
+    }
+
+
+
+
+
+    const elapsed = Date.now() - this.startTime;
+    if (elapsed >= this.duration) {
+      this.retries++;
+      if (this.retries >= 1) {
+        this.context.setState(new ProcessingState(this.context));
+      } else {
+        this.startTime = Date.now();
+      }
     }
     PBotUtils.sleep(50);
   }
@@ -187,15 +280,11 @@ class WalkingState extends State {
     const elapsed = Date.now() - this.startTime;
     const progress = Math.min(elapsed / this.duration, 1);
     const numDots = Math.floor(progress * 10);
-    const progressBar = ".".repeat(numDots);
+    const progressBar = ">".repeat(numDots);
     this.context.progressLbl.settext(`Progress: ${progressBar}`);
     this.context.activity.settext(this.activity);
 
-    const remainingTime = this.duration - elapsed;
-    if (remainingTime > 0) {
-      this.context.estLbl.settext(`Estimated time: ${this.context.formatTime(remainingTime)}`);
-    }
+    const retriesLeft = 3 - this.retries;
+    this.context.estLbl.settext(`Retries left: ${retriesLeft}`);
   }
 }
-
-
