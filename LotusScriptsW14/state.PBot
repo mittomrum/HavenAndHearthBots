@@ -3,16 +3,20 @@ const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
 const PBotCharacterAPI = Java.type("haven.purus.pbot.PBotCharacterAPI");
 const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
 const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
-const window = PBotUtils.PBotWindow(ui, "StoneDigger 2 ", 50, 110, ScriptID);
-const btnStart = window.addButton("btnStartClick", "Start", 30, 35, 30);
+
+
+
+windowWidth = 100;
+windowHeight = 200;
+const window = PBotUtils.PBotWindow(ui, "WalkAndIdle ", windowWidth, windowHeight, ScriptID);
+
+btnStart1 = 30;
+btnStart2 = 35;
+btnStart3 = 30;
+const btnStart = window.addButton("btnStartClick", "Start", btnStart1, btnStart2, btnStart3);
 
 
 // Define global variables
-let stockpileName = 'gfx/terobjs/stockpile-stone';
-let stone = "Basalt";
-var inv = PBotUtils.playerInventory(ui);
-var stoneTiles = [];
-var stockPiles = [];
 
 const tick = 500;
 let stop;
@@ -26,27 +30,35 @@ const main = () => {
 	    context.update();
 	  }	
 	}
-	PBotUtils.sysMsg(ui, "done!");
+	PBotUtils.sysMsg(ui, "Bot done!");
 };
 function btnStartClick(){
 	btnStart.destroy();
 	main();
 }
 
-class Context {
+
+
+
+
+  class Context {
   constructor() {
     this.currentState = new ProcessingState(this);
     // add window labels
+    this.timeLbl = window.addLabel("00", 30, 0);
     this.statusLbl = window.addLabel("Initializing...", 10, 10);
-    this.progressLbl = window.addLabel("", 10, 25);
-    this.estLbl = window.addLabel("Estimated time:", 10, 40);
-    this.timeLbl = window.addLabel("00", 10, 60);
+    this.progressLbl = window.addLabel(" ", 10, 25);
+    this.estLbl = window.addLabel("Estimated time:", 10, 50);    
     this.devider = window.addLabel("_______________", 25, 65);
+    this.activity = window.addLabel(" ", 10, 85);
+
+    // initialize start time
+    this.startTime = Date.now();
   }
   
   setState(state) {
-  	// perform any cleanup tasks for the processing state
-  	PBotUtils.sysMsg(ui, "exit " + this.currentState.constructor.name + "! (waiting " + 25 + "ms)" );
+    // perform any cleanup tasks for the processing state
+    // PBotUtils.sysMsg(ui, "exit " + this.currentState.constructor.name + "! (waiting " + 25 + "ms)" );
     PBotUtils.sleep(25);
     this.currentState.exit();
     this.currentState = state;
@@ -57,9 +69,11 @@ class Context {
     this.currentState.update();
     // update window labels
     this.statusLbl.settext("Current state: " + this.currentState.constructor.name);
-    this.progressLbl.settext("Progress: " + this.progress);
-    this.timeLbl.settext(this.formatTime(this.elapsedTime) + " / " + this.formatTime(this.estimatedTime));
-    
+    this.progressLbl.settext("Progress: ");
+
+    // calculate elapsed and estimated time
+    const elapsed = Date.now() - this.startTime;
+    this.timeLbl.settext(this.formatTime(elapsed));    
   }
   
   formatTime(milliseconds) {
@@ -70,154 +84,118 @@ class Context {
     return minutes.toString().padStart(2, "0") + ":" + secondsRemainder.toString().padStart(2, "0");
   }
 }
+
 // Define State classes
 class State {
   constructor(context) {
     this.context = context;
   }
-
   enter() {}
   exit() {}
   update() {}
 }
+
 class ProcessingState extends State {
 
   update() {
-    if (stoneTiles.length === 0) {
-      this.context.setState(new SetupState(this.context));
-      return;
-    }
-
-    // perform any logic needed while in the processing state
-    // transition to the idle state when processing is complete
     if (PBotGobAPI.player(ui).isMoving()) {
       this.context.setState(new WalkingState(this.context));
-    }
-    if (inv.freeSlotsInv() > 5 && stoneTiles.length > 0) {
-      this.context.setState(new DiggingState(this.context));
     } else {
-      PBotUtils.sysMsg(ui, "Failed to enter digging state..");
       this.context.setState(new IdleState(this.context));
     }
   }
 }
 
-
-class SetupState extends State {
-  enter() {
-    PBotUtils.sysMsg(ui, "Starting Setup");
-    // Find and store all stone tiles and stockpiles
-    stoneTiles = this.selectTiles();
-    stockPiles = this.selectStockpiles();
-  }
-  update() {
-    // Transition to idle state once setup is complete
-    if (stoneTiles.length > 0 && stockPiles.length > 0) {
-      PBotUtils.sysMsg(ui, "Setup complete");
-      this.context.setState(new IdleState(this.context));
-    }
-  }
-	selectTiles(){
-		let stoneTiles = [];
-		PBotUtils.sysMsg(ui, "Select area to dig stones from!");
-		PBotUtils.selectArea(ui);
-		const aCoordDig = PBotUtils.getSelectedAreaA();
-		const bCoordDig = PBotUtils.getSelectedAreaB();
-		const maxX = Math.max(aCoordDig.x, bCoordDig.x);
-		const minX = Math.min(aCoordDig.x, bCoordDig.x);
-		const maxY = Math.max(aCoordDig.y, bCoordDig.y);
-		const minY = Math.min(aCoordDig.y, bCoordDig.y);
-		PBotUtils.sysMsg(ui, maxX + " ja " + minX + " JA " + maxY + " ja " + minY);
-		for(let i=minY; i<maxY; i += 11) {
-			for(let j=minX; j<maxX; j += 11) {
-				if(PBotUtils.tileResnameAt(ui, j, i) === "gfx/tiles/mountain") {
-					stoneTiles.push({x: j, y: i});
-				}
-			}
-		}
-		return stoneTiles;
-	}
-	selectStockpiles(){
-		let stockpiles = [];
-		PBotUtils.sysMsg(ui, "Select area with stockpiles!");
-		PBotUtils.selectArea(ui);
-		const gobs = PBotUtils.gobsInArea(ui, PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
-		for(let i=0; i<gobs.size(); i++) {
-			if(gobs[i].getResname() === stockpileName)
-				stockpiles.push(gobs[i]);
-			}
-		return stockpiles;
-	}
-}
 
 class IdleState extends State {
+  constructor(context) {
+    super(context);
+    this.startTime = null;
+    this.duration = 10000;
+    this.numDots = 1;
+  }
+
+  enter() {
+    PBotUtils.sysMsg(ui, "|IdleState|", 25, 166, 231);
+    this.startTime = Date.now();
+    this.activity = "|IdleState|"
+  }
+
   update() {
-    // Check inventory space and start digging if possible
-    if (inv.freeSlotsInv() > 5 && stoneTiles.length > 0) {
-      this.context.setState(new DiggingState(this.context));
+    this.updateLabels();
+
+    if (PBotGobAPI.player(ui).isMoving()) {
+      this.context.setState(new ProcessingState(this.context));
+      return;
     } else {
-    	PBotUtils.sleep(1500);
-    	this.context.setState(new ProcessingState(this.context));
+      this.activity = "Idle .."
+      PBotUtils.sysMsg(ui, "|Standing|", 25, 166, 231);
+      PBotUtils.sleep(200);
+    }
+
+    const elapsed = Date.now() - this.startTime;
+    if (elapsed >= this.duration) {
+      this.context.setState(new ProcessingState(this.context));
+      return;
+    }
+    PBotUtils.sleep(50);
+  }
+
+  updateLabels() {
+    const elapsed = Date.now() - this.startTime;
+    const progress = Math.min(elapsed / this.duration, 1);
+    const numDots = Math.floor(progress * 10);
+    const progressBar = ">".repeat(numDots);
+    this.context.progressLbl.settext(`Progress: ${progressBar}`);
+    this.context.activity.settext(this.activity);
+
+    const remainingTime = this.duration - elapsed;
+    if (remainingTime > 0) {
+      this.context.estLbl.settext(`Estimated time: ${this.context.formatTime(remainingTime)}`);
     }
   }
 }
+
 class WalkingState extends State {
+  constructor(context) {
+    super(context);
+    this.startTime = null;
+    this.numDots = 1;
+  }
+
   enter() {
-    // perform any setup tasks for the walking state
+    PBotUtils.sysMsg(ui, "|WalkingState|", 25, 166, 231);
+    this.startTime = Date.now();
+    this.activity = "|WalkingState|"
   }
-  
-  exit() {
-    // perform any cleanup tasks for the walking state
-  }
+
   update() {
-    if (PBotGobAPI.player(ui).isMoving())  {
-    	PBotUtils.sleep(500);
+    this.updateLabels();
+
+    if (!PBotGobAPI.player(ui).isMoving()) {
+      this.context.setState(new ProcessingState(this.context));
+      return;
     } else {
-    	this.context.setState(new ProcessingState(this.context));
+      PBotUtils.sysMsg(ui, "|Walking|", 25, 166, 231);
+      this.activity = "Walking .."
+      PBotUtils.sleep(200);
+    }
+    PBotUtils.sleep(50);
+  }
+
+  updateLabels() {
+    const elapsed = Date.now() - this.startTime;
+    const progress = Math.min(elapsed / this.duration, 1);
+    const numDots = Math.floor(progress * 10);
+    const progressBar = ".".repeat(numDots);
+    this.context.progressLbl.settext(`Progress: ${progressBar}`);
+    this.context.activity.settext(this.activity);
+
+    const remainingTime = this.duration - elapsed;
+    if (remainingTime > 0) {
+      this.context.estLbl.settext(`Estimated time: ${this.context.formatTime(remainingTime)}`);
     }
   }
 }
 
-class DiggingState extends State {
-  enter() {
-    PBotUtils.sysMsg(ui, "Starting to dig");
-    // Set up a timer to update inventory every second
-  }
 
-  exit() {
-    // Stop the inventory timer when leaving digging state
-  }
-
-  update() {
-    // Check if inventory is full or no more stone tiles left to dig
-    if (inv.freeSlotsInv() <= 5 || stoneTiles.length == 0) {
-    PBotUtils.sysMsg(ui, "Digging");
-      this.dig(stoneTiles);
-      this.context.setState(new WalkingToStockpileState(this.context));
-    } else {
-    	this.context.setState(new ProcessingState(this.context));
-    }
-  }
-  	dig (tiles){
-		PBotUtils.pfLeftClick(ui, tiles[0].x, tiles[0].y);
-		PBotCharacterAPI.doAct(ui, "dig");
-		PBotUtils.mapClick(ui, tiles[0].x, tiles[0].y, 1, 0);
-		PBotCharacterAPI.cancelAct(ui);
-		if(!PBotUtils.getHourglass(ui) >= 0) {
-			PBotUtils.waitForHourglass(ui);
-		}
-	}
-}
-class WalkingToStoneTileState extends State {
-  enter() {
-    PBotUtils.sysMsg(ui, "Walking to stone tile");
-    // Find the closest stone tile and walk to it
-  }
-  update() {
-    if (PBotGobAPI.player(ui).isMoving())  {
-    	PBotUtils.sleep(5000);
-    } else {
-    	this.context.setState(new ProcessingState(this.context));
-    }
-  }
-}
