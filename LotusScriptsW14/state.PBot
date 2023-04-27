@@ -183,16 +183,18 @@ class WalkingState extends State {
 
 
 
-    const playerPos = PBotGobAPI.player(ui).getRcCoords().floor();
-    PBotUtils.sysMsg(ui, "|playerPos.x|" + playerPos.x, 25, 166, 231);
+    let stoneTiles = this.selectTiles();
+    if (stoneTiles.length > 0){
+        PBotUtils.sysMsg(ui, "|stoneTiles.length|" + stoneTiles.length, 25, 166, 231);
+        this.activity = "stoneTiles.length .." + stoneTiles.length;
+    }
 
-    
 
     if (!PBotGobAPI.player(ui).isMoving()) {
       this.context.setState(new ProcessingState(this.context));
       return;
     } else {
-      this.activity = "Walking ..";
+      this.activity = "Walking .. (dirt tiles nearby: " + stoneTiles.length + ")";
       PBotUtils.sysMsg(ui, "|Walking|", 25, 166, 231);
       PBotUtils.sleep(200);
     }
@@ -214,6 +216,29 @@ class WalkingState extends State {
 
     PBotUtils.sleep(50);
   }
+
+  selectTiles(){
+    
+      let stoneTiles = [];
+      const playerPos = PBotGobAPI.player(ui).getRcCoords().floor();
+      const radius = 10;
+      const minX = playerPos.x - radius;
+      const minY = playerPos.y - radius;
+      const maxX = playerPos.x + radius;
+      const maxY = playerPos.y + radius;
+      for(let i=minY; i<maxY; i++) {
+        for(let j=minX; j<maxX; j++) {
+          if(PBotUtils.tileResnameAt(ui, j, i) === "gfx/tiles/dirt") {
+            stoneTiles.push({x: j, y: i});
+          }
+        }
+      }
+      PBotUtils.sysMsg(ui, "|lenght|: " + stoneTiles.length, 25, 166, 231);
+      return stoneTiles;
+  }
+
+
+
 
   updateLabels() {
     const elapsed = Date.now() - this.startTime;
