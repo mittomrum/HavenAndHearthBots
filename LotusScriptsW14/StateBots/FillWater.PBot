@@ -42,16 +42,29 @@ function updateProgressBar(distance) {
 //////
 
 
-
+function arrayToList(array) {
+    return Java.to(array, 'java.lang.String[]');
+}
 function main() {
     while (!shouldStop()) {
         updateWindow("Searching ...", getProgressBar(0));
+
+        //Search Inventory for WaterSkin
+        let waterskin = PBotUtils.playerInventory(ui).getInventoryItemsByNames("Waterskin").size();
+        let stone = PBotUtils.playerInventory(ui).getInventoryItemsByNames("Feldspar").size();
+        PBotUtils.sysMsg(ui, "Waterskin: " + waterskin, 20, 234, 23);
+        PBotUtils.sysMsg(ui, "stone: " + stone, 20, 234, 23);
+
+
+        //Find water source
         const waterSource = PBotGobAPI.findGobByNames(ui, parseFloat(DEFAULT_RADIUS), WATER_GFX);
         if (!waterSource) {
             PBotUtils.sysMsg(ui, "No water source", 200, 23, 23);
             updateWindow("No water source found", 0);
             break;
         }
+        
+        //Pathfind to barrel
         pfToGob(waterSource);
         let distance = distanceToGob(waterSource);
         while (distance > 11 && !shouldStop()) {
@@ -70,11 +83,16 @@ function main() {
             updateWindow("Next to Object", getProgressBar(1));
             PBotUtils.sleep(SLEEP_TIME);
         }
+
+
+
+
+
         updateRadius(DEFAULT_RADIUS);
     }
     PBotUtils.sleep(1500);
     window.close();
-    PBotUtils.sysMsg(ui, "Bot finished!");
+    PBotUtils.sysMsg(ui, "Bot finished!", 20, 234, 23);
 }
 
 
