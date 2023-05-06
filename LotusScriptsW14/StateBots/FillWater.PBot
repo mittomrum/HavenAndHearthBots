@@ -1,35 +1,83 @@
 const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
-const PBot = Java.type("haven.purus.pbot.PBotAPI");
 const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
 const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
 
-const DEFAULT_RADIUS = 200;
+const BOT_NAME = "Water Source Search";
 const WATER_GFX = "gfx/terobjs/barrel"; // Replace with the water source gfx you want to find
+const DEFAULT_RADIUS = 100;
+const SLEEP_TIME = 1000;
 
-function findGobByGfx(radius, gfx) {
-    return PBotGobAPI.findGobByNames(ui, parseFloat(radius), gfx);
+load('util.js');
+
+// Create a window to display information about the water source search
+const windowWidth = 200;
+const windowHeight = 140;
+const window = PBotUtils.PBotWindow(ui, BOT_NAME, windowWidth, windowHeight, ScriptID);
+const radiusLabel = window.addLabel("Search Radius: " + DEFAULT_RADIUS, 10, 10);
+const statusLabel = window.addLabel("Status: Idle", 10, 30);
+const progressLabel = window.addLabel("Progress: [----------]", 10, 50);
+const btnStart = window.addButton("btnStartClick", "Start", 70, 35, 145);
+let stop = false;
+
+function btnStartClick() {
+    stop = false;
+    btnStart.destroy();
+    main();
 }
 
-function findWaterSource(radius = DEFAULT_RADIUS, gfx = WATER_GFX) {
-    const gob = findGobByGfx(radius, gfx);
-    if (gob) {
-        PBotUtils.sysMsg(ui, "Found water source");
-        return gob;
-    } else {
-        PBotUtils.sysMsg(ui, "Found no water sources");
-        return null;
-    }
+function updateWindow(status, progress) {
+    statusLabel.settext(`Status: ${status}`);
+    progressLabel.settext(`Progress: ${progress}`);
 }
+
+function updateRadius(radius) {
+    radiusLabel.settext(`Search Radius: ${radius}`);
+}
+
+function updateProgressBar(distance) {
+    const maxDistance = DEFAULT_RADIUS;
+    const progress = Math.max(0, Math.min(1, 1 - (distance / maxDistance)));
+    updateWindow("Pathfinding ... ", getProgressBar(progress));
+}
+//////
+
+
 
 function main() {
-    while (!irq()) {
-        const waterSource = findWaterSource();
+    while (!shouldStop()) {
+        updateWindow("Searching ...", getProgressBar(0));
+        const waterSource = PBotGobAPI.findGobByNames(ui, parseFloat(DEFAULT_RADIUS), WATER_GFX);
         if (!waterSource) {
+            PBotUtils.sysMsg(ui, "No water source", 200, 23, 23);
+            updateWindow("No water source found", 0);
             break;
         }
         pfToGob(waterSource);
-        // do something with the water source here
+        let distance = distanceToGob(waterSource);
+        while (distance > 11 && !shouldStop()) {
+            distance = distanceToGob(waterSource);
+            updateProgressBar(distance);
+            updateWindow("Moving", getProgressBar(distance / DEFAULT_RADIUS));
+            PBotUtils.sleep(100);
+            if (!PBotGobAPI.player(ui).isMoving()) {
+                updateWindow("Interupted", getProgressBar(distance / DEFAULT_RADIUS));
+                PBotUtils.sysMsg(ui, "Interupted, I will pause for 3 seconds");
+                PBotUtils.sleep(3000);
+                break;
+            }
+        }
+        if (distance <= 15) {
+            updateWindow("Next to Object", getProgressBar(1));
+            PBotUtils.sleep(SLEEP_TIME);
+        }
+        updateRadius(DEFAULT_RADIUS);
     }
+    PBotUtils.sleep(1500);
+    window.close();
     PBotUtils.sysMsg(ui, "Bot finished!");
 }
-main();
+
+
+function shouldStop() {
+    return stop || window.closed();
+}
