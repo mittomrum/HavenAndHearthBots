@@ -1,179 +1,35 @@
-const ui = Java.type('haven.purus.pbot.PBotAPI').ui(); 
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
 const PBot = Java.type("haven.purus.pbot.PBotAPI");
 const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
 const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
-const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
 
-let stop;
-const radius = 200;
-windowWidth = 170;
-windowHeight = 140;
-const window = PBotUtils.PBotWindow(ui, "MeatFactory", windowWidth, windowHeight, ScriptID);
-const radiusLabel = window.addLabel("Search Radius: ", 10, 10);
-const devider = window.addLabel("_______________", 25, 30);
-const textEntry = window.addTextEntry(35, radius.toString(), 90, 5);
-const cboxSkin = window.addCheckbox("checkboxSkin", "Skin all animals", false, 10, 50);
-const cboxClean = window.addCheckbox("checkboxClean", "Clean all animals", false, 10, 70);
-const cboxButcher = window.addCheckbox("checkboxButcher", "Butcher all animals", false, 10, 90);
-const cboxBones = window.addCheckbox("checkboxBones", "Collect Bones", false, 10, 110);
-window.addLabel("_______________", 20, 120);
-const btnStart = window.addButton("btnStartClick", "Start", 70, 35, 145);
+const DEFAULT_RADIUS = 200;
+const WATER_GFX = "gfx/terobjs/barrel"; // Replace with the water source gfx you want to find
 
-const statusLbl = window.addLabel("Status: Idle", 10, 105);
-const progressBarLbl = window.addLabel("Progress: [----------]", 10, 125);
-const updateWindow = (status, progress) => {
-    statusLbl.settext("Status: " + status);
-    progressBarLbl.settext("Progress: " + progress);
-}
-function getProgressBar(progress) {
-    const numDots = Math.floor(progress * 10);
-    const progressBar = "[" + ">".repeat(numDots) + "-".repeat(10 - numDots) + "]";
-    return progressBar;
+function findGobByGfx(radius, gfx) {
+    return PBotGobAPI.findGobByNames(ui, parseFloat(radius), gfx);
 }
 
-//Adding default values
-cboxSkin.setValue(true);
-cboxClean.setValue(true);
-cboxButcher.setValue(true);
-cboxBones.setValue(true);
-
-
-const btnStartClick = () => {
-    stop = false;
-    radiusLabel.destroy();
-    devider.destroy();
-    btnStart.destroy();
-    textEntry.destroy();
-    cboxSkin.destroy();
-    cboxClean.destroy();
-    cboxButcher.destroy();
-    cboxBones.destroy();
-
-    const infoRadius = window.addLabel("Radius: " + radius, 10, 20);
-    const infoSkin = window.addLabel("Skin: " + cboxSkin.getValue(), 10, 35);
-    const infoClean = window.addLabel("Clean: " + cboxClean.getValue(), 10, 50);
-    const infoButcher = window.addLabel("Butcher: " + cboxButcher.getValue(), 10, 65);
-    const infoBones = window.addLabel("Bones: " + cboxBones.getValue(), 10, 80);
-    main();
-}
-const main = () => {
-    do {
-        let gob = returnAnimal(radius);
-        if (gob == null) {
-            PBotUtils.sysMsg(ui, "Found no animals");
-            window.closeWindow();
-            stop = true;
-            break;
-        }
-        const target = window.addLabel(gob.getResname().toString(), 10, 10);
-        const targetDistance = window.addLabel("Distance: " + Math.floor(distanceToGob(gob)), 10, 30);
-
-        updateWindow("Pathfinding", getProgressBar(0));
-        pfToGob(gob);
-
-        if (cboxSkin.getValue()) {
-            gob.doClick(3, 0);
-            PBotUtils.waitForFlowerMenu();
-            if (PBotUtils.choosePetal("Skin")) {
-                updateWindow("Skinning", getProgressBar(0.25));
-                PBotUtils.sysMsg(ui, "Going to Skin");
-                PBotUtils.waitForHourglass(500);
-                PBotUtils.dropItemFromHand(0);
-            }
-        }
-        if (cboxClean.getValue()) {
-            gob.doClick(3, 0);
-            PBotUtils.waitForFlowerMenu();
-            if (PBotUtils.choosePetal("Clean")) {
-                updateWindow("Cleaning", getProgressBar(0.5));
-                PBotUtils.sysMsg(ui, "Going to Clean");
-                PBotUtils.waitForHourglass(500);
-                PBotUtils.dropItemFromHand(0);
-            }
-        }
-        if (cboxButcher.getValue()) {
-            gob.doClick(3, 0);
-            PBotUtils.waitForFlowerMenu();
-            if (PBotUtils.choosePetal("Butcher")) {
-                updateWindow("Butchering", getProgressBar(0.75));
-                PBotUtils.sysMsg(ui, "Going to Butcher");
-                PBotUtils.waitForHourglass();
-                PBotUtils.dropItemFromHand(500);
-            }
-        }
-        if (cboxBones.getValue()) {
-            gob.doClick(3, 0);
-            PBotUtils.waitForFlowerMenu();
-            if (PBotUtils.choosePetal("Collect bones")) {
-                updateWindow("Collecting Bones", getProgressBar(1));
-                PBotUtils.sysMsg(ui, "Going to Collect bones");
-                PBotUtils.waitForHourglass(500);
-                PBotUtils.dropItemFromHand(0);
-            }
-        }
-
-        PBotUtils.sysMsg(ui, "Close the window to stop");
-        PBotUtils.sysMsg(ui, "Waiting 1000ms");
-        PBotUtils.sleep(1000);
-        target.destroy();
-        targetDistance.destroy();
-    } while (!stop && !window.closed());
-    PBotUtils.sysMsg(ui, "Bot finished!");
-};
-
-
-function pfToGob(gob) {
-    // wait for player to start moving, then for player to stop
-    do {
-        if (!PBotGobAPI.player().isMoving()) { //Standing still
-            if (!gob.pfClick(1, 0)) {
-                PBotUtils.sysMsg(ui, "Cant find a way to path to the object");
-            }
-            PBotUtils.sleep(300);
-        }
-        if (PBotGobAPI.player().isMoving()) {
-            PBotUtils.sysMsg(ui,"movin' I am waiting 300ms");
-            PBotUtils.sleep(300);
-        }
-    } while (distanceToGob > 11);
-}
-function distanceToGob(gob) {
-    const gobPos = gob.getRcCoords().floor();
-    const playerPos = PBotGobAPI.player().getRcCoords().floor();
-    const distanceX = gobPos.x - playerPos.x;
-    const distanceY = gobPos.y - playerPos.y;
-    const total = pythagorean(distanceX, distanceY);
-    return total;
-}
-function pythagorean(sideA, sideB) {
-    return Math.sqrt(Math.pow(sideA, 2) + Math.pow(sideB, 2));
-}
-function returnAnimal(radius) {
-    let animalGobs = [
-        'gfx/kritter/boar/boar',
-        'gfx/kritter/wolverine/wolverine',
-        'gfx/kritter/otter/otter',
-        'gfx/kritter/cattle/cattle',
-        'gfx/kritter/fox/fox',
-        'gfx/kritter/reddeer/reddeer',
-        'gfx/kritter/beaver/beaver',
-        'gfx/kritter/badger/badger',
-        'gfx/kritter/sheep/sheep',
-    ];
-    for (var i = 0; i < animalGobs.length; i++) {
-        let gob = PBotGobAPI.findGobByNames(ui, parseFloat(radius), animalGobs[i]);
-        if (gob) {
-            return gob;
-        }
+function findWaterSource(radius = DEFAULT_RADIUS, gfx = WATER_GFX) {
+    const gob = findGobByGfx(radius, gfx);
+    if (gob) {
+        PBotUtils.sysMsg(ui, "Found water source");
+        return gob;
+    } else {
+        PBotUtils.sysMsg(ui, "Found no water sources");
+        return null;
     }
 }
 
-
-
-
-function createInfoWindow(gob) {
+function main() {
+    while (!irq()) {
+        const waterSource = findWaterSource();
+        if (!waterSource) {
+            break;
+        }
+        pfToGob(waterSource);
+        // do something with the water source here
+    }
+    PBotUtils.sysMsg(ui, "Bot finished!");
 }
-function checkboxSkin() { }
-function checkboxClean() { }
-function checkboxButcher() { }
-function checkboxBones() { }
+main();
