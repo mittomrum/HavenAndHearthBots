@@ -22,9 +22,12 @@ function createWalkAndIdleWindow() {
 
 
 
+
+
 // Define global variables
 
 const { window, btnStart } = createWalkAndIdleWindow();
+const { window: debugWindow } = createDebugWindow();
 const tick = 500;
 let stop;
 const shouldStop = () => {
@@ -44,6 +47,7 @@ const main = () => {
       context.update();
     }
   }
+  debugWindow.close();
   PBotUtils.sysMsg(ui, "Bot done!");
 };
 
@@ -58,6 +62,12 @@ function createWalkAndIdleWindow() {
   const btnStart = window.addButton("btnStartClick", "Start", btnStartX, btnStartY, btnStartWidth);
 
   return { window, btnStart };
+}
+function createDebugWindow() {
+  const windowWidth = 100;
+  const windowHeight = 200;
+  const window = PBotUtils.PBotWindow(ui, "Debug", windowWidth, windowHeight, ScriptID);
+  return { window };
 }
 
 class Context {
