@@ -6,56 +6,75 @@ const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
 
 
 
-windowWidth = 100;
-windowHeight = 200;
-const window = PBotUtils.PBotWindow(ui, "WalkAndIdle ", windowWidth, windowHeight, ScriptID);
+function createWalkAndIdleWindow() {
+  const windowWidth = 100;
+  const windowHeight = 200;
+  const window = PBotUtils.PBotWindow(ui, "WalkAndIdle", windowWidth, windowHeight, ScriptID);
 
-btnStart1 = 30;
-btnStart2 = 35;
-btnStart3 = 30;
-const btnStart = window.addButton("btnStartClick", "Start", btnStart1, btnStart2, btnStart3);
+  const btnStartX = 30;
+  const btnStartY = 35;
+  const btnStartWidth = 30;
+  const btnStart = window.addButton("btnStartClick", "Start", btnStartX, btnStartY, btnStartWidth);
 
-
-// Define global variables
-
-const tick = 500;
-let stop;
-const shouldStop = () => {
-	return stop || window.closed();
-};
-const main = () => {
-	if (!stop && !window.closed()) {
-	  const context = new Context();
-	  while (!shouldStop()) {
-	    context.update();
-	  }	
-	}
-	PBotUtils.sysMsg(ui, "Bot done!");
-};
-function btnStartClick(){
-	btnStart.destroy();
-	main();
+  return { window, btnStart };
 }
 
 
 
 
+// Define global variables
 
-  class Context {
+const { window, btnStart } = createWalkAndIdleWindow();
+const tick = 500;
+let stop;
+const shouldStop = () => {
+  return stop || window.closed();
+};
+
+
+
+function btnStartClick() {
+  btnStart.destroy();
+  main();
+}
+const main = () => {
+  if (!stop && !window.closed()) {
+    const context = new Context();
+    while (!shouldStop()) {
+      context.update();
+    }
+  }
+  PBotUtils.sysMsg(ui, "Bot done!");
+};
+
+function createWalkAndIdleWindow() {
+  const windowWidth = 100;
+  const windowHeight = 200;
+  const window = PBotUtils.PBotWindow(ui, "FillWaterFromBarrel", windowWidth, windowHeight, ScriptID);
+
+  const btnStartX = 30;
+  const btnStartY = 35;
+  const btnStartWidth = 30;
+  const btnStart = window.addButton("btnStartClick", "Start", btnStartX, btnStartY, btnStartWidth);
+
+  return { window, btnStart };
+}
+
+class Context {
   constructor() {
     this.currentState = new ProcessingState(this);
     // add window labels
     this.timeLbl = window.addLabel("00", 30, 0);
     this.statusLbl = window.addLabel("Initializing...", 10, 10);
     this.progressLbl = window.addLabel(" ", 10, 25);
-    this.estLbl = window.addLabel("Estimated time:", 10, 50);    
+    this.estLbl = window.addLabel("Estimated time:", 10, 50);
     this.devider = window.addLabel("_______________", 25, 65);
     this.activity = window.addLabel(" ", 10, 85);
 
     // initialize start time
     this.startTime = Date.now();
   }
-  
+
   setState(state) {
     // perform any cleanup tasks for the processing state
     // PBotUtils.sysMsg(ui, "exit " + this.currentState.constructor.name + "! (waiting " + 25 + "ms)" );
@@ -64,7 +83,7 @@ function btnStartClick(){
     this.currentState = state;
     this.currentState.enter();
   }
-  
+
   update() {
     this.currentState.update();
     // update window labels
@@ -73,9 +92,9 @@ function btnStartClick(){
 
     // calculate elapsed and estimated time
     const elapsed = Date.now() - this.startTime;
-    this.timeLbl.settext(this.formatTime(elapsed));    
+    this.timeLbl.settext(this.formatTime(elapsed));
   }
-  
+
   formatTime(milliseconds) {
     // helper function to format time in mm:ss format
     const seconds = Math.floor(milliseconds / 1000);
@@ -90,9 +109,9 @@ class State {
   constructor(context) {
     this.context = context;
   }
-  enter() {}
-  exit() {}
-  update() {}
+  enter() { }
+  exit() { }
+  update() { }
 }
 
 class ProcessingState extends State {
@@ -121,7 +140,7 @@ class IdleState extends State {
     this.startTime = Date.now();
     this.activity = " ";
   }
-  exit(){
+  exit() {
     this.context.progressLbl.settext(` `);
     this.context.estLbl.settext(` `);
   }
@@ -168,7 +187,7 @@ class WalkingState extends State {
     super(context);
     this.startTime = null;
     this.duration = 5000;
-    this.numDots = 1;    
+    this.numDots = 1;
     this.retries = 0;
   }
 
@@ -186,7 +205,7 @@ class WalkingState extends State {
     const playerPos = PBotGobAPI.player(ui).getRcCoords().floor();
     PBotUtils.sysMsg(ui, "|playerPos.x|" + playerPos.x, 25, 166, 231);
 
-    
+
 
     if (!PBotGobAPI.player(ui).isMoving()) {
       this.context.setState(new ProcessingState(this.context));
@@ -234,7 +253,7 @@ class ScanAreaState extends State {
     super(context);
     this.startTime = null;
     this.duration = 5000;
-    this.numDots = 1;    
+    this.numDots = 1;
     this.retries = 0;
   }
 
