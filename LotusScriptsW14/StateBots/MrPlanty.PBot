@@ -1,0 +1,201 @@
+// A farming bot, made by Purus Cor and modified by Lotus
+
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const PBotUtils = Java.type("haven.purus.pbot.PBotUtils");
+const PBotItem = Java.type("haven.purus.pbot.PBotItem");
+const PBotCharacterAPI = Java.type("haven.purus.pbot.PBotCharacterAPI");
+const PBotGobAPI = Java.type("haven.purus.pbot.PBotGobAPI");
+const PBotWindowAPI = Java.type("haven.purus.pbot.PBotWindowAPI");
+const window = PBotUtils.PBotWindow(ui, "Area Farmer", 80, 200, ScriptID);
+const startBtn = window.addButton("startFarmingBtn", "Start farming", 100, 50, 25);
+const tick = 500;
+let stop = false;
+const BOT_NAME = "MrPlanty";
+
+const crops = new Map([
+    ["gfx/terobjs/plants/carrot", { seedname: "gfx/invobjs/carrot", stages: [4] }],
+    ["gfx/terobjs/plants/flax", { seedname: "gfx/invobjs/seed-flax", stages: [3], gProduct: "gfx/terobjs/items/flaxfibre", iProduct: "gfx/invobjs/items/flaxfibre" }],
+    ["gfx/terobjs/plants/yellowonion", { seedname: "gfx/invobjs/yellowonion", stages: [3] }],
+    ["gfx/terobjs/plants/redonion", { seedname: "gfx/invobjs/redonion", stages: [3] }],
+    ["gfx/terobjs/plants/beet", { seedname: "gfx/invobjs/beet", stages: [3] }],
+    ["gfx/terobjs/plants/turnip", { seedname: "gfx/invobjs/turnip", stages: [3] }],
+    ["gfx/terobjs/plants/leek", { seedname: "gfx/invobjs/leek", stages: [4] }],
+    ["gfx/terobjs/plants/barley", { seedname: "gfx/invobjs/seed-barley", stages: [3] }],
+    ["gfx/terobjs/plants/wheat", { seedname: "gfx/invobjs/seed-wheat", stages: [3] }],
+    ["gfx/terobjs/plants/millet", { seedname: "gfx/invobjs/seed-millet", stages: [3] }],
+    ["gfx/terobjs/plants/poppy", { seedname: "gfx/invobjs/seed-poppy", stages: [4] }],
+    ["gfx/terobjs/plants/pipeweed", { seedname: "gfx/invobjs/seed-pipeweed", stages: [4] }],
+    ["gfx/terobjs/plants/lettuce", { seedname: "gfx/invobjs/seed-lettuce", stages: [4] }],
+    ["gfx/terobjs/plants/hemp", { seedname: "gfx/invobjs/seed-hemp", stages: [3, 4] }]
+]);
+
+shouldStop = () => {
+    return (stop || window.closed());
+};
+
+javaListToArray = (javalist) => {
+    const ret = [];
+    for (let i = 0; i < javalist.size(); i++)
+        ret.push(javalist.get(i));
+    return ret;
+};
+
+startFarmingBtn = () => {
+    startBtn.destroy();  
+    log(" -" + BOT_NAME + "- ", 1);
+
+    log("Please select an area by dragging!", 1);
+    PBotUtils.selectArea(ui);
+
+    const statusLbl = window.addLabel("Initializing...", 25, 5);
+    const progressLbl = window.addLabel("", 25, 30);
+    const estLbl = window.addLabel("Estimated remaining time:", 25, 45);
+    const timeLbl = window.addLabel("", 25, 60);
+
+    let gobs = javaListToArray(PBotUtils.gobsInArea(ui, PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB()));
+    gobs = gobs.filter((gob) => {
+        return (crops.has(gob.getResname()) && crops.get(gob.getResname()).stages.includes(gob.getCropStage()))
+    });
+    log("Starting to replant total of " + gobs.length + " crops!", 3);
+    const start = Date.now();
+    let processed = 0;
+    gobs.forEach((gob) => {
+        progressLbl.setText("Progress: " + Math.round(processed / gobs.length * 100) + "%");
+        let seconds = ((Date.now() - start) / processed * (gobs.length - processed)) / 1000;
+        const minutes = Math.floor((seconds) / 60);
+        seconds = Math.floor(seconds % 60);
+        timeLbl.setText(minutes + " minutes " + seconds + " seconds ");
+        processed++;
+        if (shouldStop()) return;
+        const seedname = crops.get(gob.getResname()).seedname;
+        const resname = gob.getResname();
+        // Check if stamina is under 60% - Drink if it is
+        statusLbl.setText("Checking stamina");
+        if (PBotCharacterAPI.getStamina(ui) < 60) {
+            statusLbl.setText("Drinking");
+            if (!PBotUtils.drink(ui, true)) {
+                log("Ran out of water!");
+                stop = true;
+                return;
+            }
+        }
+        
+        statusLbl.setText("Moving to crop");
+        PBotUtils.pfRightClick(ui, gob, 0);
+        if (shouldStop()) return;
+        // Harvest from flowermenu
+        statusLbl.setText("Waiting for menu");
+        PBotUtils.waitForFlowerMenu(ui);
+        if (shouldStop()) return;
+        statusLbl.setText("Harvesting");
+        PBotUtils.choosePetal(ui, "Harvest");
+        if (shouldStop()) return;
+        // Wait for gob to disappear
+        while (PBotGobAPI.findGobById(ui, gob.getGobId()) != null) {
+            if (shouldStop()) return;
+            PBotUtils.sleep(tick);
+        }
+
+
+        // Wait for seeds to appear in inventory
+        statusLbl.setText("Waiting for seeds");
+        let seeds;
+        do {
+            seeds = javaListToArray(PBotUtils.playerInventory(ui).getInventoryItemsByResnames([seedname].toString()));            
+            PBotUtils.sleep(tick);
+            if (shouldStop()) return;
+        } while (seeds.length === 0);
+
+        // sort seeds by quality
+        const getHighestQualitySeedAndCount = (seeds) => {
+            if (seeds.length === 0) {
+                return { seed: null, count: 0 };
+            }
+            seeds.sort((a, b) => b.getQuality() - a.getQuality());
+            const highestQuality = seeds[0].getQuality();
+            const count = seeds.filter(seed => seed.getQuality() === highestQuality).length;
+            return { seed: seeds[0], count: count };
+        };
+        const { seed: highestQualitySeed, count: highestQualitySeedCount } = getHighestQualitySeedAndCount(seeds);
+        log("Highest quality seed: " + highestQualitySeed.getQuality() + ", count: " + highestQualitySeedCount);
+
+
+
+
+        // Take a seed into hand
+        statusLbl.setText("Taking seed into hand");
+        let itemInvCoords = highestQualitySeed.getInvLoc();
+        if (itemInvCoords === null) {
+            log("Seed not found in inventory!", 3);
+        }
+        while (PBotUtils.getItemAtHand(ui) == null) {
+            highestQualitySeed.takeItem(true);
+            PBotUtils.sleep(tick);
+            if (shouldStop()) return;
+        }
+
+        // Plant the seed
+        statusLbl.setText("Planting the seed");
+        // Wait for crop to appear below us        
+        while (PBotGobAPI.findGobByNames(ui, 1.0, java.util.Arrays.asList([resname])) == null && PBotUtils.getItemAtHand(ui) != null) {
+            if (!PBotGobAPI.player(ui).isMoving()) {
+                PBotUtils.mapInteractClick(ui);
+            }
+            PBotUtils.sleep(tick);
+            if (shouldStop()) return;
+        }
+
+        //Place seed back into inventory
+        const placeSeedBackInInventory = (itemInvCoords, maxWaitTime) => {
+            const startTime = Date.now();
+            while (PBotUtils.playerInventory(ui).getItemFromInventoryAtLocation(itemInvCoords.x, itemInvCoords.y) == null) {
+                if (Date.now() - startTime > maxWaitTime) {
+                    log("Timeout reached while waiting for seed to appear in inventory (" + maxWaitTime + "ms)");
+                    return false;
+                }
+                log("Wait for seed to appear in inventory");
+                PBotUtils.playerInventory(ui).dropItemToInventory(itemInvCoords);
+                PBotUtils.sleep(Math.round(maxWaitTime / 10));
+                if (shouldStop()) return false;
+            }
+            return true;
+        };
+        if (PBotUtils.getItemAtHand(ui) != null) {
+            if (!placeSeedBackInInventory(itemInvCoords, tick)) {
+                return;
+            }
+        }
+
+        // Drop seed(s) from hand and inventory
+        if (PBotUtils.playerInventory(ui).freeSlotsInv() < 1) {
+            statusLbl.setText("Dropping excess seeds under quality : ");
+            log("Dropping excess seeds under quality : " + highestQualitySeed.getQuality());
+            for (let i = 0; i < seeds.length; i++) {
+                if (seeds[i].getQuality() < highestQualitySeed.getQuality()) {
+                    seeds[i].dropItemFromInventory();
+                }
+            }
+        }
+
+    });
+    //ENDING
+    let seconds = (Date.now() - start) / 1000;
+    const minutes = Math.floor((seconds) / 60);
+    seconds = Math.floor(seconds % 60);
+    console.log((Date.now() - start) / 1000);
+    log("Farming finished! Time elapsed: " + minutes + " minutes " + seconds + " seconds", 3);
+    window.closeWindow();
+};
+
+const log = (message, level = 0) => {
+    const colors = {
+        0: [173, 216, 230],   // Light blue
+        1: [255, 140, 0],     // Dark orange
+        2: [255, 0, 0],       // Red
+        3: [255, 0, 128],      // bright pink
+        4: [170, 180, 235]       // Light Grey
+    };
+    const color = colors[level] || colors[0];
+    PBotUtils.sysMsg(ui, message, color[0], color[1], color[2]);
+};
+
