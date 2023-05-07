@@ -44,7 +44,7 @@ startFarmingBtn = () => {
     startBtn.destroy();  
     log(" -" + BOT_NAME + "- ", 1);
 
-    log("Please select an area by dragging!", 1);
+    log("Please select an area by dragging!", 4);
     PBotUtils.selectArea(ui);
 
     const statusLbl = window.addLabel("Initializing...", 25, 5);
@@ -56,7 +56,7 @@ startFarmingBtn = () => {
     gobs = gobs.filter((gob) => {
         return (crops.has(gob.getResname()) && crops.get(gob.getResname()).stages.includes(gob.getCropStage()))
     });
-    log("Starting to replant total of " + gobs.length + " crops!", 3);
+    log("Starting to replant total of " + gobs.length + " crops!", 4);
     const start = Date.now();
     let processed = 0;
     gobs.forEach((gob) => {
@@ -168,15 +168,17 @@ startFarmingBtn = () => {
 
         // Drop seed(s) from hand and inventory
         if (PBotUtils.playerInventory(ui).freeSlotsInv() < 1) {
-            statusLbl.setText("Dropping excess seeds under quality : ");
-            log("Dropping excess seeds under quality : " + highestQualitySeed.getQuality());
+            let seedsToKeep = 5;
+            statusLbl.setText("Dropping excess seeds");
+            log("Dropping excess seeds (" + seedsToKeep +  ") under quality: " + highestQualitySeed.getQuality());
             for (let i = 0; i < seeds.length; i++) {
-                if (seeds[i].getQuality() < highestQualitySeed.getQuality()) {
+                if (seeds[i].getQuality() < highestQualitySeed.getQuality() || seedsToKeep <= 0) {
                     seeds[i].dropItemFromInventory();
+                } else {
+                    seedsToKeep--;
                 }
             }
         }
-
     });
     //ENDING
     let seconds = (Date.now() - start) / 1000;
