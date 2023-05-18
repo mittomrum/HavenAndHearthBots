@@ -1,0 +1,111 @@
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotCharacterAPI = Java.type('haven.purus.pbot.PBotCharacterAPI');
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+
+////////////////
+windowWidth = 100;
+windowHeight = 200;
+const window = PBotUtils.PBotWindow(ui, "Kill Trees!", windowWidth, windowHeight, ScriptID);
+const btnStart = window.addButton("btnStartClick", "Start", 70, windowWidth - 35, 70);
+const btnStartClick = () => {
+    stop = false;
+    btnStart.hide();
+    main();
+    btnStart.show();
+}
+///////////////
+const tick = 500;
+let stop;
+const shouldStop = () => {
+    return stop || window.closed();
+};
+const main = () => {
+    if (!stop && !window.closed()) {
+        //window
+        const statusLbl = window.addLabel("Initializing...", 10, 10);
+        const progressLbl = window.addLabel("", 10, 25);
+        const estLbl = window.addLabel("Estimated time:", 10, 40);
+        const timeLbl = window.addLabel("00", 10, 60);
+        const devider = window.addLabel("_______________", 25, 65);
+        //add bushes, trees and stopms into seperate containers
+        var aBushes = [];
+        var aTrees = [];
+        PBotUtils.selectArea(ui);
+        let allGobs = PBotUtils.gobsInArea(ui, PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
+        for (let g of allGobs) {
+            if (isBush(g))
+                aBushes.push(g);
+            if (isTree(g))
+                aTrees.push(g);
+        }
+        let workorder = aTrees.concat(aBushes);
+        statusLbl.setText("Added Workorders!");
+        PBotUtils.sleep(tick);
+        statusLbl.setText("Sorting Workorders");
+        workorder = workorder.sort(
+            (a, b) =>
+                PBotGobAPI.player(ui).getRcCoords().dist(a.getRcCoords()) - PBotGobAPI.player(ui).getRcCoords().dist(b.getRcCoords())
+        );
+        statusLbl.setText("Sorting Done!");
+        PBotUtils.sleep(tick);
+        statusLbl.setText("Amount of objects: " + workorder.length);
+        const start = Date.now();
+        let processed = 0;
+        workorder.forEach((gob) => {
+            progressLbl.setText("Progress: " + Math.round(processed / workorder.length * 100) + "%");
+            let seconds = ((Date.now() - start) / processed * (workorder.length - processed)) / 1000;
+            const minutes = Math.floor((seconds) / 60);
+            seconds = Math.floor(seconds % 60);
+            timeLbl.setText(minutes + " minutes " + seconds + " seconds ");
+            processed++;
+            if (shouldStop()) return;
+            chopTree(gob);
+            waitForIdle();
+        });
+        //destoy the window components
+        statusLbl.destroy();
+        progressLbl.destroy();
+        estLbl.destroy();
+        timeLbl.destroy();
+        devider.destroy();
+        PBotUtils.sysMsg(ui, "done!");
+    };
+    function isBush(a) {
+        let res = false;
+        try {
+            let gobName = a.getResname();
+            res = gobName.startsWith("gfx/terobjs/bushes/");
+        } catch (e) { }
+        return res;
+    }
+    function isTree(a) {
+        let res = false;
+        try {
+            let gobName = a.getResname();
+            if (gobName.endsWith("stump") || gobName.endsWith("log")) return false;
+            res = gobName.startsWith("gfx/terobjs/trees/"); //|| gobName.startsWith("gfx/terobjs/bushes/");
+        } catch (e) { }
+        return res;
+    }
+    function chopTree(gob) {
+        PBotUtils.sysMsg(ui, "Target: " + gob.getResname().toString());
+        PBotUtils.pfmovegob(ui, gob);
+        gob.doClick(3, 0);
+        PBotUtils.waitForFlowerMenu(ui);
+        if (!PBotUtils.choosePetal(ui, "Chop")) PBotUtils.closeFlowermenu(ui);
+    }
+    function waitForIdle() {
+        const maxWaitTICKs = 4;
+        const TICK = 200;
+        let idleCounter = maxWaitTICKs;
+        while (idleCounter >= 0) {
+            if (PBotUtils.getHourglass(ui) == -1)
+                idleCounter--;
+            else {
+                idleCounter = maxWaitTICKs;
+            }
+            PBotUtils.sleep(TICK);
+        }
+    }
+}
