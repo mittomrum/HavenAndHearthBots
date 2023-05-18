@@ -12,39 +12,100 @@ function info(s, l) {
     if (l <= messageLevel)
         PBotUtils.sysMsg(ui, s + "", 128, 192, 200);
 }
+function sinfo(s, l) {
+    if (l <= messageLevel)
+        PBotUtils.sysMsg(ui, s + "", 50, 200, 60);
+}
 
 const VERSIONNAME = "1.0"
 const WINDOWNAME = "Arbonist";
 const HOWTO = "HOWTO:\n  1. Use checkboxes\n  2. press start \n 3. select area with trees \n";
 const TICK = 200;
-const FLOWEROPTION = "Take bark";
+const FLOWEROPTION = "Take bough";
 
 const messageLevel = 4;
 var stopmsg = [];
 var start = Date.now();
 
 ////////////////
-const windowHeight = 130;
+const windowHeight = 230;
 const windowWidth = 180;
 const window = PBotUtils.PBotWindow(ui, WINDOWNAME, windowHeight, windowWidth, ScriptID);
 //First Screen
 const btnStart = window.addButton("btnStartClick", "Start", 80, 25, 10);
 const howtoBtn = window.addButton("howtoBtnClick", "?", 25, 104, 10);
 const devider = window.addLabel("_____________", 25, 25);
-const rangeLbl = window.addLabel("Option: ", 15, 65);
-const textEntry = window.addTextEntry(100, FLOWEROPTION.toString(), 55, 63);
+
+
+const cboxBranch = window.addCheckbox("checkboxBranch", "Take Branches", false, 10, 50);
+const cboxBark = window.addCheckbox("checkboxBark", "Take Bark", false, 10, 70);
+const cboxLeaves = window.addCheckbox("checkboxLeaves", "Pick Leaves", false, 10, 90);
+const cboxBerries = window.addCheckbox("checkboxBerries", "Pick Berries", false, 10, 110);
+const cboxCustom = window.addCheckbox("checkboxCustom", "", false, 10, 130);
+const optionEntry = window.addTextEntry(100, FLOWEROPTION, 31, 130);
+
+
+
+function checkboxBranch() { }
+function checkboxBark() { }
+function checkboxLeaves() { }
+function checkboxBerries() { }
+function checkboxCustom() { }
+
+
+//Adding default values
+cboxBranch.setValue(false);
+cboxBark.setValue(false);
+cboxLeaves.setValue(false);
+cboxBerries.setValue(false);
+cboxCustom.setValue(true);
+
+
+
+
 btnStart.changeColor(30, 200, 45);
 //Second Screen (After user presses start)
 const btnStartClick = () => {
+    const infoBranch = window.addLabel("Branch: " + cboxBranch.getValue(), 10, 85);
+    const infoBark = window.addLabel("Bark: " + cboxBark.getValue(), 10, 95);
+    const infoLeaves = window.addLabel("Leaves: " + cboxLeaves.getValue(), 10, 105);
+    const infoBerries = window.addLabel("Berries: " + cboxBerries.getValue(), 10, 115);
+    const infoCustom = window.addLabel("Custom: " + cboxCustom.getValue(), 10, 125);
+    
     btnStart.hide();
     howtoBtn.hide();
-    rangeLbl.hide();
-    textEntry.hide();
+    devider.hide();
+    cboxBranch.hide();
+    cboxBark.hide();
+    cboxLeaves.hide();
+    cboxBerries.hide();
+    cboxCustom.hide();    
+    optionEntry.hide();
+    
+    infoBranch.show();
+    infoBark.show();
+    infoLeaves.show();
+    infoBerries.show();
+    infoCustom.show();
+
+
     main()
     btnStart.show();
     howtoBtn.show();
-    rangeLbl.show();
-    textEntry.show();
+    devider.show();
+    cboxBranch.show();
+    cboxBark.show();
+    cboxLeaves.show();
+    cboxBerries.show();
+    cboxCustom.show();
+    optionEntry.show();
+
+    infoBranch.hide();
+    infoBark.hide();
+    infoLeaves.hide();
+    infoBerries.hide();
+    infoCustom.hide();
+
     info("Bot Done!", 0);
 }
 const howtoBtnClick = () => {
@@ -67,36 +128,66 @@ const main = () => {
         const devider = window.addLabel("_______________", 25, 65);
 
 
-        //add bushes, trees and stopms into seperate containers
+        let stockpiles = [];
+
+
         var aterobjs = [];
-        PBotUtils.sysMsg(ui, "Click item from inventory to drop");
-        const selectedItem = PBotUtils.selectItem(ui);
+        let aTreesWithBranches = [];
+        let aTreesWithBark = [];
+        let aTreesWithLeaves = [];
+        let aTreesWithBerries = [];
+        let aTreesWithCustom = [];
+
         PBotUtils.selectArea(ui);
         let allGobs = PBotUtils.gobsInArea(ui, PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
-        let allGobsWithBranches = [];
-        let allGobsWithCustomFlowerOption = [];
         const playerPos = PBotGobAPI.player(ui).getRcCoords().floor();
         for (let g of allGobs) {
             if (isterobjs(g))
                 aterobjs.push(g);
-            if (hasBranch(g))
-                allGobsWithBranches.push(g);            
-            PBotUtils.mapClick(ui, playerPos.x, playerPos.y, 1, 0);
-            if (hasCustomFlowerOption(g))
-                allGobsWithCustomFlowerOption.push(g);      
+            if (cboxBranch.getValue()) {
+                if (checkForOption(g, "Take branch"))
+                    aTreesWithBranches.push(g);  
+            }           
+            if (cboxBark.getValue()) {
+                if (checkForOption(g, "Take bark"))
+                    aTreesWithBark.push(g);
+            } 
+            if (cboxLeaves.getValue()) {
+                if (checkForOption(g, "Pick leaves"))
+                    aTreesWithLeaves.push(g);
+            }
+            if (cboxBerries.getValue()) {
+                if (checkForOption(g, "Pick berries"))
+                    aTreesWithBerries.push(g);     
+            }
+            if (cboxCustom.getValue()) {
+                if (checkForOption(g, FLOWEROPTION))
+                    aTreesWithCustom.push(g);
+            }
             PBotUtils.mapClick(ui, playerPos.x, playerPos.y, 1, 0);
         }
-        PBotUtils.sysMsg(ui, "Amount of objects with brances: " + allGobsWithBranches.length);
-        PBotUtils.sysMsg(ui, "Amount of objects with custom option: " + allGobsWithCustomFlowerOption.length);
+        PBotUtils.sysMsg(ui, "Amount of objects: " + aterobjs.length);
+        PBotUtils.sysMsg(ui, "Amount of Branch Trees: " + aTreesWithBranches.length);
+        PBotUtils.sysMsg(ui, "Amount of Bark Trees: " + aTreesWithBark.length);
+        PBotUtils.sysMsg(ui, "Amount of Leaves Trees: " + aTreesWithLeaves.length);
+        PBotUtils.sysMsg(ui, "Amount of Berries Trees: " + aTreesWithBerries.length);
+        PBotUtils.sysMsg(ui, "Amount of Custom Trees: " + aTreesWithCustom.length);
+
 
 
 
 
         
         //let workorder = aterobjs.concat(aBushes);
-        let workorder = aterobjs;
+        let workorder = [];
+        if (cboxBranch.getValue()) workorder = workorder.concat(aTreesWithBranches);
+        if (cboxBark.getValue()) workorder = workorder.concat(aTreesWithBark);
+        if (cboxLeaves.getValue()) workorder = workorder.concat(aTreesWithLeaves);
+        if (cboxBerries.getValue()) workorder = workorder.concat(aTreesWithBerries);
+        if (cboxCustom.getValue()) workorder = workorder.concat(aTreesWithCustom);
+
         statusLbl.setText("Added Workorders!");
-        statusLbl.setText("Amount of objects: " + workorder.length);
+        PBotUtils.sysMsg(ui, "Amount of work: " + workorder.length);
         PBotUtils.sleep(TICK);
 
         //sort workorder by distance
@@ -112,6 +203,7 @@ const main = () => {
         const start = Date.now();
         let processed = 0;
         workorder.forEach((gob) => {
+            statusLbl.setText("Processing: " + processed + "/" + workorder.length);
             progressLbl.setText("Progress: " + Math.round(processed / workorder.length * 100) + "%");
             let seconds = ((Date.now() - start) / processed * (workorder.length - processed)) / 1000;
             const minutes = Math.floor((seconds) / 60);
@@ -124,12 +216,80 @@ const main = () => {
             }
             if (shouldStop()) return;
 
-            const items = javaListToArray(PBotUtils.playerInventory(ui).getInventoryItemsByResnames(selectedItem.getResname().toString()));
-            if (PBotUtils.playerInventory(ui).freeSlotsInv() < 5) {
-                PBotUtils.sysMsg(ui, "Drop Inventory!", 22, 112, 22);
-                for (let i = 1; i < items.length; i++)
-                    items[i].dropItemFromInventory();
+            //check if I have enough space in inventory
+            const maxSlotsToFree = 1;
+            if (PBotUtils.playerInventory(ui).freeSlotsInv() < maxSlotsToFree) {
+                let allGobsInv = PBotUtils.playerInventory(ui).getInventoryContents();
+                sinfo("Found " + allGobsInv.length + " items in inventory", 2);
+                for (let item of allGobsInv) {
+                    if (isDroppable(item) && PBotUtils.playerInventory(ui).freeSlotsInv() < maxSlotsToFree) {
+                        item.dropItemFromInventory();
+                    }
+                }
+            }          
+
+            pfToGob(gob);  
+
+            if (cboxBranch.getValue()) {
+                gob.doClick(3, 0);
+                PBotUtils.waitForFlowerMenu(ui, TICK);
+                if (PBotUtils.choosePetal(ui, "Take branch")) {
+                    PBotUtils.waitForHourglass(ui, 500);
+                    PBotUtils.sleep(TICK * 3);
+                } else {
+                    PBotUtils.closeFlowermenu(ui);
+                }
+                PBotUtils.dropItemFromHand(ui, 0);
             }
+            if (cboxBark.getValue()) {
+                gob.doClick(3, 0);
+                PBotUtils.waitForFlowerMenu(ui, TICK);
+                if (PBotUtils.choosePetal(ui, "Take bark")) {
+                    PBotUtils.waitForHourglass(ui, 500);
+                    PBotUtils.dropItemFromHand(ui, 0);
+                    PBotUtils.sleep(TICK * 3);
+                } else {
+                    PBotUtils.closeFlowermenu(ui);
+                }
+                PBotUtils.dropItemFromHand(ui, 0);
+            }
+            if (cboxBerries.getValue()) {   
+                gob.doClick(3, 0);
+                PBotUtils.waitForFlowerMenu(ui, TICK);
+                if (PBotUtils.choosePetal(ui, "Pick berries")) {
+                    PBotUtils.waitForHourglass(ui, 500);
+                    PBotUtils.dropItemFromHand(ui, 0);
+                    PBotUtils.sleep(TICK * 3);
+                } else {
+                    PBotUtils.closeFlowermenu(ui);
+                }
+                PBotUtils.dropItemFromHand(ui, 0);
+            }
+            if (cboxLeaves.getValue()) {
+                gob.doClick(3, 0);
+                PBotUtils.waitForFlowerMenu(ui, TICK);
+                if (PBotUtils.choosePetal(ui, "Take leaves")) {
+                    PBotUtils.waitForHourglass(ui, 500);
+                    PBotUtils.dropItemFromHand(ui, 0);
+                    PBotUtils.sleep(TICK * 3);
+                } else {
+                    PBotUtils.closeFlowermenu(ui);
+                }
+                PBotUtils.dropItemFromHand(ui, 0);
+            }
+            if (cboxCustom.getValue()) {
+                gob.doClick(3, 0);
+                PBotUtils.waitForFlowerMenu(ui, TICK);
+                if (PBotUtils.choosePetal(ui, FLOWEROPTION)) {
+                    PBotUtils.waitForHourglass(ui, 500);
+                    PBotUtils.dropItemFromHand(ui, 0);
+                    PBotUtils.sleep(TICK * 3);
+                } else {
+                    PBotUtils.closeFlowermenu(ui);
+                }
+                PBotUtils.dropItemFromHand(ui, 0);
+            }
+
             //pfToGob(gob);
             //TakeBranch(gob);
             waitForIdle();
@@ -144,9 +304,18 @@ const main = () => {
         devider.destroy();
         PBotUtils.sysMsg(ui, "done!", 222,12,22);
     };
-
-
-
+    function isDroppable(a) {
+        let res = false;
+        try {
+            let gobName = a.getResname();
+            res = gobName.startsWith("gfx/invobjs/leaf") ||
+                gobName.startsWith("gfx/invobjs/branch") ||
+                gobName.startsWith("gfx/invobjs/seed") ||
+                gobName.startsWith("gfx/invobjs/bough") ||
+                gobName.endsWith("bark");
+        } catch (e) { }
+        return res;
+    }
     function isterobjs(a) {
         let res = false;
         try {
@@ -155,21 +324,20 @@ const main = () => {
         } catch (e) { }
         return res;
     }
-    function hasCustomFlowerOption(gob) {
-        PBotUtils.sysMsg(ui, "flower Option: " + FLOWEROPTION, 100, 123, 123);
+    function checkForOption(gob, flowerOption) {
+        PBotUtils.sysMsg(ui, "Option: " + flowerOption, 100, 123, 123);
         gob.doClick(3, 0);
         PBotUtils.waitForFlowerMenu(ui, 100);
 
-        if (!PBotUtils.choosePetal(ui, FLOWEROPTION.toString())) {
+        if (!PBotUtils.choosePetal(ui, flowerOption.toString())) {
             PBotUtils.closeFlowermenu(ui);
             return false;
         } else {
             PBotUtils.closeFlowermenu(ui);
             return true;
         }
-    }
-    
-    function hasBranch(gob){
+    }    
+    function checkForBranches(gob){
         PBotUtils.sysMsg(ui, "hasBranch()", 123, 123, 123);
         gob.doClick(3, 0);        
         PBotUtils.waitForFlowerMenu(ui, 100);
@@ -195,16 +363,12 @@ const main = () => {
             return true;
         }
     }
-
     function TakeBranch(gob) {
         PBotUtils.sysMsg(ui, "Target: " + gob.getResname().toString());
         gob.doClick(3, 0);
         PBotUtils.waitForFlowerMenu(ui);
         if (!PBotUtils.choosePetal(ui, "Take branch")) PBotUtils.closeFlowermenu(ui);
     }
-
-
-
     function stutterStep() {
         PBotUtils.sysMsg(ui, "Stutterstep", 200, 50, 20);
         PBotGobAPI.player(ui).doClick(1, 0);
@@ -212,7 +376,7 @@ const main = () => {
     }
     function waitForIdle() {
         const maxWaitTICKs = 4;
-        const TICK = 200;
+        const TICK = 100;
         let idleCounter = maxWaitTICKs;
         while (idleCounter >= 0 && !shouldStop()) {
             if (PBotUtils.getHourglass(ui) == -1)
@@ -250,8 +414,6 @@ const main = () => {
     function pythagorean(sideA, sideB) {
         return Math.sqrt(Math.pow(sideA, 2) + Math.pow(sideB, 2));
     }    
-
-
     function irq() {
         if (PBotCharacterAPI.getStamina(ui) < 35) err("Out of stamina");
         if (PBotCharacterAPI.getEnergy(ui) < 35) err("Out of energy");

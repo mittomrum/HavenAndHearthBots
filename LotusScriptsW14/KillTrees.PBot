@@ -4,10 +4,10 @@ const PBotCharacterAPI = Java.type('haven.purus.pbot.PBotCharacterAPI');
 const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
 
 ////////////////
-windowWidth = 100;
-windowHeight = 200;
-const window = PBotUtils.PBotWindow(ui, "Kill Trees!", windowWidth, windowHeight, ScriptID);
-const btnStart = window.addButton("btnStartClick", "Start", 70, windowWidth - 35, 70);
+windowHeight = 100;
+windowWidth = 200;
+const window = PBotUtils.PBotWindow(ui, "Kill Trees!", windowHeight, windowWidth, ScriptID);
+const btnStart = window.addButton("btnStartClick", "Start", 70, windowHeight - 35, 70);
 const btnStartClick = () => {
     stop = false;
     btnStart.hide();
@@ -41,14 +41,14 @@ const main = () => {
         }
         let workorder = aTrees.concat(aBushes);
         statusLbl.setText("Added Workorders!");
-        PBotUtils.sleep(tick);
+        PBotUtils.sleep(TICK);
         statusLbl.setText("Sorting Workorders");
         workorder = workorder.sort(
             (a, b) =>
                 PBotGobAPI.player(ui).getRcCoords().dist(a.getRcCoords()) - PBotGobAPI.player(ui).getRcCoords().dist(b.getRcCoords())
         );
         statusLbl.setText("Sorting Done!");
-        PBotUtils.sleep(tick);
+        PBotUtils.sleep(TICK);
         statusLbl.setText("Amount of objects: " + workorder.length);
         const start = Date.now();
         let processed = 0;
