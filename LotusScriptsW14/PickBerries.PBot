@@ -1,0 +1,253 @@
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotCharacterAPI = Java.type('haven.purus.pbot.PBotCharacterAPI');
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+
+const javaListToArray = (javalist) => {
+    const ret = [];
+    for (let i = 0; i < javalist.size(); i++)
+        ret.push(javalist.get(i));
+    return ret;
+};
+
+
+/*
+
+
+const VERSIONNAME = "1.0"
+const WINDOWNAME = "Arbonist";
+const HOWTO = "HOWTO:\n  1. Use checkboxes\n  2. press start \n 3. select area with trees \n";
+const TICK = 200;
+const FLOWEROPTION = "Pick Branch";
+//const PEDALOPTION = "";
+
+const messageLevel = 4;
+var stopmsg = [];
+var start = Date.now();
+
+////////////////
+windowWidth = 100;
+windowHeight = 150;
+const window = PBotUtils.PBotWindow(ui, WINDOWNAME, windowWidth, windowHeight, ScriptID);
+//First Screen
+const btnStart = window.addButton("btnStartClick", "Start", 80, 25, 10);
+const howtoBtn = window.addButton("howtoBtnClick", "?", 25, 104, 10);
+const devider = window.addLabel("_____________", 25, 25);
+const rangeLbl = window.addLabel("Option: ", 35, 65);
+const textEntry = window.addTextEntry(35, FLOWEROPTION.toString(), 85, 63);
+btnStart.changeColor(30, 200, 45);
+//Second Screen (After user presses start)
+const btnStartClick = () => {
+    btnStart.hide();
+    howtoBtn.hide();
+    rangeLbl.hide();
+    textEntry.hide();
+    main()
+    btnStart.show();
+    howtoBtn.show();
+    rangeLbl.show();
+    textEntry.show();
+    info("Bot Done!", 0);
+}
+const howtoBtnClick = () => {
+    info(WINDOWNAME + " " + VERSIONNAME + " " + HOWTO, 0)
+} */
+
+
+////////////////
+windowWidth = 100;
+windowHeight = 200;
+const window = PBotUtils.PBotWindow(ui, "Kill Trees!", windowWidth, windowHeight, ScriptID);
+const btnStart = window.addButton("btnStartClick", "Start", 70, windowWidth - 35, 70);
+const btnStartClick = () => {
+    stop = false;
+    btnStart.hide();
+    main();
+    btnStart.show();
+}
+///////////////
+const tick = 500;
+let stop;
+const shouldStop = () => {
+    return stop || window.closed();
+};
+const main = () => {
+    if (!stop && !window.closed()) {
+        //window
+        const statusLbl = window.addLabel("Initializing...", 10, 10);
+        const progressLbl = window.addLabel("", 10, 25);
+        const estLbl = window.addLabel("Estimated time:", 10, 40);
+        const timeLbl = window.addLabel("00", 10, 60);
+        const devider = window.addLabel("_______________", 25, 65);
+
+
+        //add bushes, trees and stopms into seperate containers
+        var aterobjs = [];
+        PBotUtils.sysMsg(ui, "Click item from inventory to drop");
+        const selectedItem = PBotUtils.selectItem(ui);
+        PBotUtils.selectArea(ui);
+        let allGobs = PBotUtils.gobsInArea(ui, PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
+        let allGobsWithBranches = [];
+        let allGobsWithBark = [];
+        const playerPos = PBotGobAPI.player(ui).getRcCoords().floor();
+        for (let g of allGobs) {
+            if (isterobjs(g))
+                aterobjs.push(g);
+            if (hasBranch(g))
+                allGobsWithBranches.push(g);            
+            PBotUtils.mapClick(ui, playerPos.x, playerPos.y, 1, 0);
+            if (hasBark(g))
+                allGobsWithBark.push(g);      
+            PBotUtils.mapClick(ui, playerPos.x, playerPos.y, 1, 0);
+        }
+        PBotUtils.sysMsg(ui, "Amount of objects with brances: " + allGobsWithBranches.length);
+        PBotUtils.sysMsg(ui, "Amount of objects with bark: " + allGobsWithBark.length);
+
+
+
+
+        
+        //let workorder = aterobjs.concat(aBushes);
+        let workorder = aterobjs;
+        statusLbl.setText("Added Workorders!");
+        statusLbl.setText("Amount of objects: " + workorder.length);
+        PBotUtils.sleep(tick);
+
+        //sort workorder by distance
+        statusLbl.setText("Sorting Workorders");
+        workorder = workorder.sort(
+            (a, b) =>
+                PBotGobAPI.player(ui).getRcCoords().dist(a.getRcCoords()) - PBotGobAPI.player(ui).getRcCoords().dist(b.getRcCoords())
+        );
+        statusLbl.setText("Sorting Done!");
+        PBotUtils.sleep(tick);
+
+        //start working
+        const start = Date.now();
+        let processed = 0;
+        workorder.forEach((gob) => {
+            progressLbl.setText("Progress: " + Math.round(processed / workorder.length * 100) + "%");
+            let seconds = ((Date.now() - start) / processed * (workorder.length - processed)) / 1000;
+            const minutes = Math.floor((seconds) / 60);
+            seconds = Math.floor(seconds % 60);
+            timeLbl.setText(minutes + " minutes " + seconds + " seconds ");
+            processed++;
+            if (PBotCharacterAPI.getEnergy(ui) < 22) {
+                PBotUtils.sysMsg(ui, "Not Enough Energy! (2200+)");
+                stop = true;
+            }
+            if (shouldStop()) return;
+
+            const items = javaListToArray(PBotUtils.playerInventory(ui).getInventoryItemsByResnames(selectedItem.getResname().toString()));
+            if (PBotUtils.playerInventory(ui).freeSlotsInv() < 5) {
+                PBotUtils.sysMsg(ui, "Drop Inventory!", 22, 112, 22);
+                for (let i = 1; i < items.length; i++)
+                    items[i].dropItemFromInventory();
+            }
+            //pfToGob(gob);
+            //TakeBranch(gob);
+            waitForIdle();
+        });
+
+
+        //destoy the window components
+        statusLbl.destroy();
+        progressLbl.destroy();
+        estLbl.destroy();
+        timeLbl.destroy();
+        devider.destroy();
+        PBotUtils.sysMsg(ui, "done!", 222,12,22);
+    };
+
+
+
+    function isterobjs(a) {
+        let res = false;
+        try {
+            let gobName = a.getResname();
+            res = gobName.startsWith("gfx/terobjs");
+        } catch (e) { }
+        return res;
+    }
+    function hasBranch(gob){
+        PBotUtils.sysMsg(ui, "hasBranch()", 123, 123, 123);
+        gob.doClick(3, 0);        
+        PBotUtils.waitForFlowerMenu(ui, 100);
+                
+        if (!PBotUtils.choosePetal(ui, "Take branch")){
+            PBotUtils.closeFlowermenu(ui);
+            return false;
+        } else {
+            PBotUtils.closeFlowermenu(ui);
+            return true;
+        }        
+    }
+    function hasBark(gob) {
+        PBotUtils.sysMsg(ui, "hasBark()", 123, 123, 123);
+        gob.doClick(3, 0);
+        PBotUtils.waitForFlowerMenu(ui, 100);
+
+        if (!PBotUtils.choosePetal(ui, "Take bark")) {
+            PBotUtils.closeFlowermenu(ui);
+            return false;
+        } else {
+            PBotUtils.closeFlowermenu(ui);
+            return true;
+        }
+    }
+
+    function TakeBranch(gob) {
+        PBotUtils.sysMsg(ui, "Target: " + gob.getResname().toString());
+        gob.doClick(3, 0);
+        PBotUtils.waitForFlowerMenu(ui);
+        if (!PBotUtils.choosePetal(ui, "Take branch")) PBotUtils.closeFlowermenu(ui);
+    }
+
+
+
+    function stutterStep() {
+        PBotUtils.sysMsg(ui, "Stutterstep", 200, 50, 20);
+        PBotGobAPI.player(ui).doClick(1, 0);
+        PBotUtils.sleep(TICK * 3);
+    }
+    function waitForIdle() {
+        const maxWaitTICKs = 4;
+        const TICK = 200;
+        let idleCounter = maxWaitTICKs;
+        while (idleCounter >= 0 && !shouldStop()) {
+            if (PBotUtils.getHourglass(ui) == -1)
+                idleCounter--;            
+            else {
+                idleCounter = maxWaitTICKs;
+            }
+            if (PBotCharacterAPI.getStamina(ui) < 40) PBotUtils.drink(ui, true); //drink water if stamina is low
+            PBotUtils.sleep(TICK);
+        }
+    }
+    function pfToGob(gob) {
+        // wait for player to start moving, then for player to stop
+        do {
+            if (!PBotGobAPI.player(ui).isMoving()) { //Standing still
+                if (!gob.pfClick(1, 0)) {
+                    PBotUtils.sysMsg(ui, "Cant find a way to path to the object");
+                }
+                PBotUtils.sleep(300);
+            }
+            if (PBotGobAPI.player(ui).isMoving()) {
+                PBotUtils.sysMsg(ui, "movin' I am waiting 300ms");
+                PBotUtils.sleep(300);
+            }
+        } while (distanceToGob > 11);
+    }
+    function distanceToGob(gob) {
+        const gobPos = gob.getRcCoords().floor();
+        
+        const distanceX = gobPos.x - playerPos.x;
+        const distanceY = gobPos.y - playerPos.y;
+        const total = pythagorean(distanceX, distanceY);
+        return total;
+    }
+    function pythagorean(sideA, sideB) {
+        return Math.sqrt(Math.pow(sideA, 2) + Math.pow(sideB, 2));
+    }    
+}
