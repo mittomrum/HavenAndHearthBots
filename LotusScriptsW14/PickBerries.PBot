@@ -17,7 +17,7 @@ const VERSIONNAME = "1.0"
 const WINDOWNAME = "Arbonist";
 const HOWTO = "HOWTO:\n  1. Use checkboxes\n  2. press start \n 3. select area with trees \n";
 const TICK = 200;
-const FLOWEROPTION = "Take branch";
+const FLOWEROPTION = "Take bark";
 
 const messageLevel = 4;
 var stopmsg = [];
@@ -79,9 +79,9 @@ const main = () => {
         for (let g of allGobs) {
             if (isterobjs(g))
                 aterobjs.push(g);
-            /*if (hasBranch(g))
-            allGobsWithBranches.push(g);            
-            PBotUtils.mapClick(ui, playerPos.x, playerPos.y, 1, 0); */
+            if (hasBranch(g))
+                allGobsWithBranches.push(g);            
+            PBotUtils.mapClick(ui, playerPos.x, playerPos.y, 1, 0);
             if (hasCustomFlowerOption(g))
                 allGobsWithCustomFlowerOption.push(g);      
             PBotUtils.mapClick(ui, playerPos.x, playerPos.y, 1, 0);
