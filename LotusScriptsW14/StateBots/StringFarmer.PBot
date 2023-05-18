@@ -1,0 +1,123 @@
+// A farming bot, made by Purus Cor and modified by Lotus
+
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const PBotUtils = Java.type("haven.purus.pbot.PBotUtils");
+const PBotItem = Java.type("haven.purus.pbot.PBotItem");
+const PBotCharacterAPI = Java.type("haven.purus.pbot.PBotCharacterAPI");
+const PBotGobAPI = Java.type("haven.purus.pbot.PBotGobAPI");
+const PBotWindowAPI = Java.type("haven.purus.pbot.PBotWindowAPI");
+const window = PBotUtils.PBotWindow(ui, "Area Farmer", 80, 200, ScriptID);
+const startBtn = window.addButton("startFarmingBtn", "Start farming", 100, 50, 25);
+const tick = 500;
+let stop = false;
+const BOT_NAME = "Place In Stockpiles";
+
+
+
+const stockpiles = new Map([
+    ["gfx/terobjs/plants/carrot", { seedname: "gfx/invobjs/carrot", stages: [4] }],
+    ["gfx/terobjs/plants/flax", { seedname: "gfx/invobjs/seed-flax", stages: [3], gProduct: "gfx/terobjs/items/flaxfibre", iProduct: "gfx/invobjs/items/flaxfibre" }],
+    ["gfx/terobjs/plants/yellowonion", { seedname: "gfx/invobjs/yellowonion", stages: [3] }],
+    ["gfx/terobjs/plants/redonion", { seedname: "gfx/invobjs/redonion", stages: [3] }],
+    ["gfx/terobjs/plants/beet", { seedname: "gfx/invobjs/beet", stages: [3] }],
+    ["gfx/terobjs/plants/turnip", { seedname: "gfx/invobjs/turnip", stages: [3] }],
+    ["gfx/terobjs/plants/leek", { seedname: "gfx/invobjs/leek", stages: [4] }],
+    ["gfx/terobjs/plants/barley", { seedname: "gfx/invobjs/seed-barley", stages: [3] }],
+    ["gfx/terobjs/plants/wheat", { seedname: "gfx/invobjs/seed-wheat", stages: [3] }],
+    ["gfx/terobjs/plants/millet", { seedname: "gfx/invobjs/seed-millet", stages: [3] }],
+    ["gfx/terobjs/plants/poppy", { seedname: "gfx/invobjs/seed-poppy", stages: [4] }],
+    ["gfx/terobjs/plants/pipeweed", { seedname: "gfx/invobjs/seed-pipeweed", stages: [4] }],
+    ["gfx/terobjs/plants/lettuce", { seedname: "gfx/invobjs/seed-lettuce", stages: [4] }],
+    ["gfx/terobjs/plants/hemp", { seedname: "gfx/invobjs/seed-hemp", stages: [3, 4] }]
+]);
+
+function findStockpiles(radius) {
+    let stockpilesGobs = [
+        'gfx/terobjs/plants/stockpile-onion',
+    ];
+    for (var i = 0; i < stockpilesGobs.length; i++) {
+        let gob = PBotGobAPI.findGobByNames(ui, parseFloat(radius), stockpilesGobs[i]);
+        if (gob) {
+            return gob;
+        }
+    }
+}
+
+shouldStop = () => {
+    return (stop || window.closed());
+};
+
+javaListToArray = (javalist) => {
+    const ret = [];
+    for (let i = 0; i < javalist.size(); i++)
+        ret.push(javalist.get(i));
+    return ret;
+};
+
+startFarmingBtn = () => {
+    startBtn.destroy();  
+    log(" -" + BOT_NAME + "- ", 1);
+
+    const statusLbl = window.addLabel("Initializing...", 25, 5);
+    const progressLbl = window.addLabel("", 25, 30);
+    const estLbl = window.addLabel("Estimated remaining time:", 25, 45);
+    const timeLbl = window.addLabel("", 25, 60);
+    const start = Date.now();
+    let processed = 0;
+
+    let gobs = javaListToArray(PBotUtils.gobsInArea(ui, ));
+    gobs = gobs.filter((gob) => {
+        return (crops.has(gob.getResname()) && crops.get(gob.getResname()).stages.includes(gob.getCropStage()))
+    });
+
+    
+    gobs.forEach((gob) => {        
+        if (shouldStop()) return;
+        progressLbl.setText("Progress: " + Math.round(processed / gobs.length * 100) + "%");
+        let seconds = ((Date.now() - start) / processed * (gobs.length - processed)) / 1000;
+        const minutes = Math.floor((seconds) / 60);
+        seconds = Math.floor(seconds % 60);
+        timeLbl.setText(minutes + " minutes " + seconds + " seconds ");
+        processed++;
+
+        // Check if stamina is under 60% - Drink if it is
+        statusLbl.setText("Checking stamina");
+        if (PBotCharacterAPI.getStamina(ui) < 60) {
+            statusLbl.setText("Drinking");
+            if (!PBotUtils.drink(ui, true)) {
+                log("Ran out of water!");
+                stop = true;
+                return;
+            }
+        }
+        
+
+        //Search for nearby stockpiles
+        
+        if (shouldStop()) return;
+
+    });
+
+
+
+    //ENDING
+    let seconds = (Date.now() - start) / 1000;
+    const minutes = Math.floor((seconds) / 60);
+    seconds = Math.floor(seconds % 60);
+    console.log((Date.now() - start) / 1000);
+    log("Farming finished! Time elapsed: " + minutes + " minutes " + seconds + " seconds", 3);
+    window.closeWindow();
+};
+
+const log = (message, level = 0) => {
+    const colors = {
+        0: [173, 216, 230],   // Light blue
+        1: [255, 140, 0],     // Dark orange
+        2: [255, 0, 0],       // Red
+        3: [255, 0, 128],      // bright pink
+        4: [170, 180, 235]       // Light Grey
+    };
+    const color = colors[level] || colors[0];
+    PBotUtils.sysMsg(ui, message, color[0], color[1], color[2]);
+};
+
