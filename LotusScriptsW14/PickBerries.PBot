@@ -2,39 +2,37 @@ const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
 const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
 const PBotCharacterAPI = Java.type('haven.purus.pbot.PBotCharacterAPI');
 const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
-
 const javaListToArray = (javalist) => {
     const ret = [];
     for (let i = 0; i < javalist.size(); i++)
         ret.push(javalist.get(i));
     return ret;
 };
-
-
-/*
-
+function info(s, l) {
+    if (l <= messageLevel)
+        PBotUtils.sysMsg(ui, s + "", 128, 192, 200);
+}
 
 const VERSIONNAME = "1.0"
 const WINDOWNAME = "Arbonist";
 const HOWTO = "HOWTO:\n  1. Use checkboxes\n  2. press start \n 3. select area with trees \n";
 const TICK = 200;
-const FLOWEROPTION = "Pick Branch";
-//const PEDALOPTION = "";
+const FLOWEROPTION = "Take branch";
 
 const messageLevel = 4;
 var stopmsg = [];
 var start = Date.now();
 
 ////////////////
-windowWidth = 100;
-windowHeight = 150;
-const window = PBotUtils.PBotWindow(ui, WINDOWNAME, windowWidth, windowHeight, ScriptID);
+const windowHeight = 130;
+const windowWidth = 180;
+const window = PBotUtils.PBotWindow(ui, WINDOWNAME, windowHeight, windowWidth, ScriptID);
 //First Screen
 const btnStart = window.addButton("btnStartClick", "Start", 80, 25, 10);
 const howtoBtn = window.addButton("howtoBtnClick", "?", 25, 104, 10);
 const devider = window.addLabel("_____________", 25, 25);
-const rangeLbl = window.addLabel("Option: ", 35, 65);
-const textEntry = window.addTextEntry(35, FLOWEROPTION.toString(), 85, 63);
+const rangeLbl = window.addLabel("Option: ", 15, 65);
+const textEntry = window.addTextEntry(100, FLOWEROPTION.toString(), 55, 63);
 btnStart.changeColor(30, 200, 45);
 //Second Screen (After user presses start)
 const btnStartClick = () => {
@@ -51,23 +49,11 @@ const btnStartClick = () => {
 }
 const howtoBtnClick = () => {
     info(WINDOWNAME + " " + VERSIONNAME + " " + HOWTO, 0)
-} */
+} 
 
 
-////////////////
-windowWidth = 100;
-windowHeight = 200;
-const window = PBotUtils.PBotWindow(ui, "Kill Trees!", windowWidth, windowHeight, ScriptID);
-const btnStart = window.addButton("btnStartClick", "Start", 70, windowWidth - 35, 70);
-const btnStartClick = () => {
-    stop = false;
-    btnStart.hide();
-    main();
-    btnStart.show();
-}
 ///////////////
-const tick = 500;
-let stop;
+let stop = false;
 const shouldStop = () => {
     return stop || window.closed();
 };
@@ -88,20 +74,20 @@ const main = () => {
         PBotUtils.selectArea(ui);
         let allGobs = PBotUtils.gobsInArea(ui, PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
         let allGobsWithBranches = [];
-        let allGobsWithBark = [];
+        let allGobsWithCustomFlowerOption = [];
         const playerPos = PBotGobAPI.player(ui).getRcCoords().floor();
         for (let g of allGobs) {
             if (isterobjs(g))
                 aterobjs.push(g);
-            if (hasBranch(g))
-                allGobsWithBranches.push(g);            
-            PBotUtils.mapClick(ui, playerPos.x, playerPos.y, 1, 0);
-            if (hasBark(g))
-                allGobsWithBark.push(g);      
+            /*if (hasBranch(g))
+            allGobsWithBranches.push(g);            
+            PBotUtils.mapClick(ui, playerPos.x, playerPos.y, 1, 0); */
+            if (hasCustomFlowerOption(g))
+                allGobsWithCustomFlowerOption.push(g);      
             PBotUtils.mapClick(ui, playerPos.x, playerPos.y, 1, 0);
         }
         PBotUtils.sysMsg(ui, "Amount of objects with brances: " + allGobsWithBranches.length);
-        PBotUtils.sysMsg(ui, "Amount of objects with bark: " + allGobsWithBark.length);
+        PBotUtils.sysMsg(ui, "Amount of objects with custom option: " + allGobsWithCustomFlowerOption.length);
 
 
 
@@ -111,7 +97,7 @@ const main = () => {
         let workorder = aterobjs;
         statusLbl.setText("Added Workorders!");
         statusLbl.setText("Amount of objects: " + workorder.length);
-        PBotUtils.sleep(tick);
+        PBotUtils.sleep(TICK);
 
         //sort workorder by distance
         statusLbl.setText("Sorting Workorders");
@@ -120,7 +106,7 @@ const main = () => {
                 PBotGobAPI.player(ui).getRcCoords().dist(a.getRcCoords()) - PBotGobAPI.player(ui).getRcCoords().dist(b.getRcCoords())
         );
         statusLbl.setText("Sorting Done!");
-        PBotUtils.sleep(tick);
+        PBotUtils.sleep(TICK);
 
         //start working
         const start = Date.now();
@@ -169,6 +155,20 @@ const main = () => {
         } catch (e) { }
         return res;
     }
+    function hasCustomFlowerOption(gob) {
+        PBotUtils.sysMsg(ui, "flower Option: " + FLOWEROPTION, 100, 123, 123);
+        gob.doClick(3, 0);
+        PBotUtils.waitForFlowerMenu(ui, 100);
+
+        if (!PBotUtils.choosePetal(ui, FLOWEROPTION.toString())) {
+            PBotUtils.closeFlowermenu(ui);
+            return false;
+        } else {
+            PBotUtils.closeFlowermenu(ui);
+            return true;
+        }
+    }
+    
     function hasBranch(gob){
         PBotUtils.sysMsg(ui, "hasBranch()", 123, 123, 123);
         gob.doClick(3, 0);        
@@ -250,4 +250,32 @@ const main = () => {
     function pythagorean(sideA, sideB) {
         return Math.sqrt(Math.pow(sideA, 2) + Math.pow(sideB, 2));
     }    
+
+
+    function irq() {
+        if (PBotCharacterAPI.getStamina(ui) < 35) err("Out of stamina");
+        if (PBotCharacterAPI.getEnergy(ui) < 35) err("Out of energy");
+        
+        if (PBotWindowAPI.getWindow(ui, WINDOWNAME) == null) {
+            info("Stopped", 0);
+            return true;
+        }
+        if (stopmsg.length == 0) {
+        return false;
+        } else {
+        let errstr = "⚠ ";
+        for (let r of stopmsg) {
+        errstr += r + " ⚠ ";
+        }
+        PBotUtils.sysMsg(ui, errstr, 255, 128, 0);
+        return true;
+        }
+    }
+    function err(s) {
+    stopmsg.push(s);
+    }
+    function info(s, l) {
+        if (l <= messageLevel)
+        PBotUtils.sysMsg(ui, s + "", 128, 192, 200);
+    }
 }
