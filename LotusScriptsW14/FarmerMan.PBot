@@ -1,0 +1,203 @@
+const ui = Java.type("haven.purus.pbot.PBotAPI").ui();
+const PBotUtils = Java.type("haven.purus.pbot.PBotUtils");
+const PBotCharacterAPI = Java.type("haven.purus.pbot.PBotCharacterAPI");
+const PBotGobAPI = Java.type("haven.purus.pbot.PBotGobAPI");
+const Coord = Java.type("haven.Coord");
+const window = PBotUtils.PBotWindow(ui, "Planter", 30, 100, ScriptID);
+const startBtn = window.addButton("startFarmingBtn", "Start farming", 50, 5, 5);
+const infoLabel = window.addLabel("", 5, 5);
+
+startBtn.changeColor(255, 200, 255);
+
+let stop = false;
+
+function shouldStop() {
+	if (window.closed()) PBotUtils.sysMsg(ui, "Windows closed!");
+	return window.closed() || stop;
+};
+
+const startFarmingBtn = () => {
+	infoLabel.setText("Start");
+	startBtn.hide();
+	PBotUtils.sysMsg(ui, "Select zone!");
+	PBotUtils.selectArea(ui);
+	PBotUtils.sysMsg(ui, "Select SEED in inventory!");
+	const seed = PBotUtils.selectItem(ui);
+	const seedName = seed.getResname();
+	const aCoord = PBotUtils.getSelectedAreaA();
+	const bCoord = PBotUtils.getSelectedAreaB();
+
+	let fieldTiles = [];
+	const maxX = Math.max(aCoord.x, bCoord.x);
+	const minX = Math.min(aCoord.x, bCoord.x);
+	const maxY = Math.max(aCoord.y, bCoord.y);
+	const minY = Math.min(aCoord.y, bCoord.y);
+	for (let i = minY; i < maxY; i += 11) {
+		if (i % 2 == 0) {
+			for (let j = minX; j < maxX; j += 11) {
+				if (PBotUtils.tileResnameAt(ui, j, i) === "gfx/tiles/field") {
+					if (findcrop("plants", new Coord(j, i)))
+						continue;
+					fieldTiles.push({x: j, y: i});
+				}
+			}
+		} else {
+			for (let j = maxX - 11; j >= minX; j -= 11) {
+				if (PBotUtils.tileResnameAt(ui, j, i) === "gfx/tiles/field") {
+					if (findcrop("plants", new Coord(j, i)))
+						continue;
+					fieldTiles.push({x: j, y: i});
+				}
+			}
+		}
+
+	}
+
+	PBotUtils.sysMsg(ui, "fieldTiles.length" + fieldTiles.length);
+	for (let i = 0; i < fieldTiles.length; i++) {
+		infoLabel.setText(i + "");
+		if (shouldStop()) {
+		    return;
+		}
+		let inventoryItems = PBotUtils.playerInventory(ui).getInventoryItemsByResnames(seedName);
+		if (inventoryItems.size() == 0 && !seedInHand(seedName)) {
+			PBotUtils.sysMsg(ui, "Seeds null");
+			stop = true;
+		}
+		
+		if (!seedInHand(seedName)) {
+			inventoryItems = PBotUtils.playerInventory(ui).getInventoryItemsByResnames(seedName);
+			for (let j = 0; j < inventoryItems.size() || !shouldStop(); j++) {
+				if (isAmount(inventoryItems[j])) {
+					takeItem(inventoryItems[j], 50);
+					break;
+				}
+				if (j == inventoryItems.size() - 1) {
+					PBotUtils.sysMsg(ui, "Seeds null");
+					return;
+				}
+			}
+		}
+		PBotUtils.mapInteractClick(ui);
+		waitseed(1000, "plants");
+		PBotUtils.sleep(1000);
+	}
+	dropToInventory(50);
+	stop = false;
+	startBtn.show();
+	infoLabel.setText("");
+	PBotUtils.sysMsg(ui, "Finish");
+};
+
+const pc = () => PBotGobAPI.player(ui).gob.rc;
+
+function move(cc) {
+	infoLabel.setText("move");
+	//PBotUtils.mapClick(ui, x, y, 1, 0);
+	if (!PBotUtils.pfLeftClick(ui, cc.x, cc.y)) {
+		PBotUtils.sysMsg(ui, "Path not found!");
+		return false;
+	}
+	if (!waitmove(20000, cc.x, cc.y)) {
+		PBotUtils.sysMsg(ui, "Timeout!");
+		return false;
+	}
+	return true;
+}
+
+function center(tc) {
+	let xa = Math.floor(tc.x / 11.0) * 11.0;
+	let xb = Math.floor((tc.x + 11.0) / 11.0) * 11.0;
+	let ya = Math.floor(tc.y / 11.0) * 11.0;
+	let yb = Math.floor((tc.y + 11.0) / 11.0) * 11.0;
+	let cx = (xa + xb) / 2;
+	let cy = (ya + yb) / 2;
+	
+	return {x: cx, y: cy};
+}
+
+function waitmove(time, x, y) {
+	infoLabel.setText("waitmove");
+	for (let i = 0, sleep = 10; i < time && !shouldStop(); i += sleep) {
+		if (pc().x == x && pc().y == y) 
+			return true;
+		PBotUtils.sleep(sleep);
+	}
+	return false;
+}
+
+function takeItem(seed, time) {
+	infoLabel.setText("takeItem");
+	while (!seed.takeItem(time) && !shouldStop()) {}
+	return true;
+}
+
+function dropToInventory(time) {
+	infoLabel.setText("dropToInventory");
+	PBotUtils.sysMsg(ui, "dropToInventory!");
+	let handitem = PBotUtils.getItemAtHand(ui);
+	while (handitem != null && !shouldStop()) {
+		let inv = PBotUtils.playerInventory(ui);
+		if (inv == null) return;
+		inv.dropItemToInventory(inv.freeSpaceForItem(handitem));
+		for (let i = 0, sleep = 10; i < time && handitem != null && !shouldStop(); i += sleep) {
+			handitem = PBotUtils.getItemAtHand(ui);
+			PBotUtils.sleep(sleep);
+		}
+	}
+}
+
+function seedInHand(seedName) {
+	infoLabel.setText("seedInHand");
+	let handitem = PBotUtils.getItemAtHand(ui);
+	try {
+	    while (handitem.getResname() == null) {
+	        PBotUtils.sleep(10);
+	    }
+	} catch (e) {}
+	if (handitem != null && (!isAmount(handitem) || handitem.getResname() != seedName)) {
+		dropToInventory(50);
+		return false;
+	}
+	return (handitem != null && isAmount(handitem) && handitem.getResname() === seedName);
+}
+
+function isAmount(item) {
+    return (item != null && (!item.getResname().contains("seed") || item.getAmount() >= 5));
+}
+
+function waitseed(time, cropName) {
+	infoLabel.setText("waitseed");
+	let crop = findseed(cropName);
+
+	for (let i = 0, sleep = 10; i < time && crop == false && !shouldStop(); i += sleep) {
+		crop = findseed(cropName);
+		PBotUtils.sleep(sleep);
+	}
+	return true;
+}
+
+function findseed(cropName) {
+	infoLabel.setText("findseed");
+	let crops = PBotGobAPI.getGobsInRadius(ui, 3);
+	if (crops != null && crops.size() > 0) {
+		for (let crop of crops) {
+			if (shouldStop()) return false;
+			if (iscrop(crop, cropName))
+				return true;
+		}
+	}
+	return false;
+}
+
+const iscrop = (crop, cropName) => (crop != null && crop.getResname() != null && crop.getResname().contains(cropName));
+
+function findcrop(cropName, cc) {
+	infoLabel.setText("findcrop");
+
+	let gobs = PBotUtils.gobsInArea(ui, cc, cc.add(11, 11));
+    for (let gob of gobs) {
+        if (iscrop(gob, cropName)) return true;
+    }
+	return false;
+}
