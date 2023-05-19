@@ -1,0 +1,319 @@
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotCharacterAPI = Java.type("haven.purus.pbot.PBotCharacterAPI");
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
+
+
+
+function createWalkAndIdleWindow() {
+  const windowWidth = 100;
+  const windowHeight = 200;
+  const window = PBotUtils.PBotWindow(ui, "WalkAndIdle", windowWidth, windowHeight, ScriptID);
+
+  const btnStartX = 30;
+  const btnStartY = 35;
+  const btnStartWidth = 30;
+  const btnStart = window.addButton("btnStartClick", "Start", btnStartX, btnStartY, btnStartWidth);
+
+  return { window, btnStart };
+}
+
+
+
+
+
+
+// Define global variables
+
+const { window, btnStart } = createWalkAndIdleWindow();
+const { window: debugWindow } = createDebugWindow();
+const tick = 500;
+let stop;
+const shouldStop = () => {
+  return stop || window.closed();
+};
+
+
+
+function btnStartClick() {
+  btnStart.destroy();
+  main();
+}
+const main = () => {
+  if (!stop && !window.closed()) {
+    const context = new Context();
+    while (!shouldStop()) {
+      context.update();
+    }
+  }
+  debugWindow.close();
+  PBotUtils.sysMsg(ui, "Bot done!");
+};
+
+function createWalkAndIdleWindow() {
+  const windowWidth = 100;
+  const windowHeight = 200;
+  const window = PBotUtils.PBotWindow(ui, "FillWaterFromBarrel", windowWidth, windowHeight, ScriptID);
+
+  const btnStartX = 30;
+  const btnStartY = 35;
+  const btnStartWidth = 30;
+  const btnStart = window.addButton("btnStartClick", "Start", btnStartX, btnStartY, btnStartWidth);
+
+  return { window, btnStart };
+}
+function createDebugWindow() {
+  const windowWidth = 100;
+  const windowHeight = 200;
+  const window = PBotUtils.PBotWindow(ui, "Debug", windowWidth, windowHeight, ScriptID);
+  return { window };
+}
+
+class Context {
+  constructor() {
+    this.currentState = new ProcessingState(this);
+    // add window labels
+    this.timeLbl = window.addLabel("00", 30, 0);
+    this.statusLbl = window.addLabel("Initializing...", 10, 10);
+    this.progressLbl = window.addLabel(" ", 10, 25);
+    this.estLbl = window.addLabel("Estimated time:", 10, 50);
+    this.devider = window.addLabel("_______________", 25, 65);
+    this.activity = window.addLabel(" ", 10, 85);
+
+    // initialize start time
+    this.startTime = Date.now();
+  }
+
+  setState(state) {
+    // perform any cleanup tasks for the processing state
+    // PBotUtils.sysMsg(ui, "exit " + this.currentState.constructor.name + "! (waiting " + 25 + "ms)" );
+    PBotUtils.sleep(25);
+    this.currentState.exit();
+    this.currentState = state;
+    this.currentState.enter();
+  }
+
+  update() {
+    this.currentState.update();
+    // update window labels
+    this.statusLbl.settext("Current state: " + this.currentState.constructor.name);
+    this.progressLbl.settext("Progress: ");
+
+    // calculate elapsed and estimated time
+    const elapsed = Date.now() - this.startTime;
+    this.timeLbl.settext(this.formatTime(elapsed));
+  }
+
+  formatTime(milliseconds) {
+    // helper function to format time in mm:ss format
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const secondsRemainder = seconds % 60;
+    return minutes.toString().padStart(2, "0") + ":" + secondsRemainder.toString().padStart(2, "0");
+  }
+}
+
+// Define State classes
+class State {
+  constructor(context) {
+    this.context = context;
+  }
+  enter() { }
+  exit() { }
+  update() { }
+}
+
+class ProcessingState extends State {
+
+  update() {
+    if (PBotGobAPI.player(ui).isMoving()) {
+      this.context.setState(new WalkingState(this.context));
+    } else {
+      this.context.setState(new IdleState(this.context));
+    }
+  }
+}
+
+
+class IdleState extends State {
+  constructor(context) {
+    super(context);
+    this.startTime = null;
+    this.duration = 2000;
+    this.numDots = 1;
+    this.retries = 0;
+  }
+
+  enter() {
+    PBotUtils.sysMsg(ui, "|IdleState|", 25, 166, 231);
+    this.startTime = Date.now();
+    this.activity = " ";
+  }
+  exit() {
+    this.context.progressLbl.settext(` `);
+    this.context.estLbl.settext(` `);
+  }
+
+  update() {
+    this.updateLabels();
+
+    if (PBotGobAPI.player(ui).isMoving()) {
+      this.context.setState(new ProcessingState(this.context));
+      return;
+    } else {
+      this.activity = "Idle ..";
+      PBotUtils.sysMsg(ui, "|Standing|", 25, 166, 231);
+      PBotUtils.sleep(200);
+    }
+
+    const elapsed = Date.now() - this.startTime;
+    if (elapsed >= this.duration) {
+      this.retries++;
+      if (this.retries >= 3) {
+        this.context.setState(new ProcessingState(this.context));
+      } else {
+        this.startTime = Date.now();
+      }
+    }
+    PBotUtils.sleep(50);
+  }
+
+  updateLabels() {
+    const elapsed = Date.now() - this.startTime;
+    const progress = Math.min(elapsed / this.duration, 1);
+    const numDots = Math.floor(progress * 10);
+    const progressBar = ">".repeat(numDots);
+    this.context.progressLbl.settext(`Progress: ${progressBar}`);
+    this.context.activity.settext(this.activity);
+
+    const retriesLeft = 3 - this.retries;
+    this.context.estLbl.settext(`Retries left: ${retriesLeft}`);
+  }
+}
+
+class WalkingState extends State {
+  constructor(context) {
+    super(context);
+    this.startTime = null;
+    this.duration = 5000;
+    this.numDots = 1;
+    this.retries = 0;
+  }
+
+  enter() {
+    PBotUtils.sysMsg(ui, "|WalkingState|", 25, 166, 231);
+    this.startTime = Date.now();
+    this.activity = " "
+  }
+
+  update() {
+    this.updateLabels();
+
+
+
+    const playerPos = PBotGobAPI.player(ui).getRcCoords().floor();
+    PBotUtils.sysMsg(ui, "|playerPos.x|" + playerPos.x, 25, 166, 231);
+
+
+
+    if (!PBotGobAPI.player(ui).isMoving()) {
+      this.context.setState(new ProcessingState(this.context));
+      return;
+    } else {
+      this.activity = "Walking ..";
+      PBotUtils.sysMsg(ui, "|Walking|", 25, 166, 231);
+      PBotUtils.sleep(200);
+    }
+
+
+
+
+
+    const elapsed = Date.now() - this.startTime;
+    if (elapsed >= this.duration) {
+      this.retries++;
+      if (this.retries >= 3) {
+        this.context.setState(new ProcessingState(this.context));
+      } else {
+        this.startTime = Date.now();
+      }
+    }
+
+
+    PBotUtils.sleep(50);
+  }
+
+  updateLabels() {
+    const elapsed = Date.now() - this.startTime;
+    const progress = Math.min(elapsed / this.duration, 1);
+    const numDots = Math.floor(progress * 10);
+    const progressBar = ">".repeat(numDots);
+    this.context.progressLbl.settext(`Progress: ${progressBar}`);
+    this.context.activity.settext(this.activity);
+
+    const retriesLeft = 3 - this.retries;
+    this.context.estLbl.settext(`Retries left: ${retriesLeft}`);
+  }
+}
+
+
+class ScanAreaState extends State {
+  constructor(context) {
+    super(context);
+    this.startTime = null;
+    this.duration = 5000;
+    this.numDots = 1;
+    this.retries = 0;
+  }
+
+  enter() {
+    PBotUtils.sysMsg(ui, "|ScanAreaState|", 25, 166, 231);
+    this.startTime = Date.now();
+    this.activity = " "
+  }
+
+  update() {
+    this.updateLabels();
+
+    var aGameObjects = [];
+    const playerPos = PBotGobAPI.player().getRcCoords().floor();
+    PBotUtils.sysMsg(ui, "|playerPos.x|" + playerPos.x, 25, 166, 231);
+
+    if (aGameObjects.length > 0) {
+      this.context.setState(new ProcessingState(this.context));
+      return;
+    } else {
+      this.activity = "Selecting Objects ..";
+      PBotUtils.sysMsg(ui, "|ScanAreaState|", 25, 166, 231);
+      PBotUtils.sleep(200);
+    }
+
+
+
+
+
+    const elapsed = Date.now() - this.startTime;
+    if (elapsed >= this.duration) {
+      this.retries++;
+      if (this.retries >= 1) {
+        this.context.setState(new ProcessingState(this.context));
+      } else {
+        this.startTime = Date.now();
+      }
+    }
+    PBotUtils.sleep(50);
+  }
+
+  updateLabels() {
+    const elapsed = Date.now() - this.startTime;
+    const progress = Math.min(elapsed / this.duration, 1);
+    const numDots = Math.floor(progress * 10);
+    const progressBar = ">".repeat(numDots);
+    this.context.progressLbl.settext(`Progress: ${progressBar}`);
+    this.context.activity.settext(this.activity);
+
+    const retriesLeft = 3 - this.retries;
+    this.context.estLbl.settext(`Retries left: ${retriesLeft}`);
+  }
+}

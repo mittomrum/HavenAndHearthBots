@@ -1,0 +1,101 @@
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+
+const BOT_NAME = "Water Source Search";
+const WATER_GFX = "gfx/terobjs/barrel"; // Replace with the water source gfx you want to find
+const DEFAULT_RADIUS = 100;
+const SLEEP_TIME = 1000;
+
+load('util.js');
+
+// Create a window to display information about the water source search
+const windowWidth = 200;
+const windowHeight = 140;
+const window = PBotUtils.PBotWindow(ui, BOT_NAME, windowWidth, windowHeight, ScriptID);
+const radiusLabel = window.addLabel("Search Radius: " + DEFAULT_RADIUS, 10, 10);
+const statusLabel = window.addLabel("Status: Idle", 10, 30);
+const progressLabel = window.addLabel("Progress: [----------]", 10, 50);
+const btnStart = window.addButton("btnStartClick", "Start", 70, 35, 145);
+let stop = false;
+
+function btnStartClick() {
+    stop = false;
+    btnStart.destroy();
+    main();
+}
+
+function updateWindow(status, progress) {
+    statusLabel.settext(`Status: ${status}`);
+    progressLabel.settext(`Progress: ${progress}`);
+}
+
+function updateRadius(radius) {
+    radiusLabel.settext(`Search Radius: ${radius}`);
+}
+
+function updateProgressBar(distance) {
+    const maxDistance = DEFAULT_RADIUS;
+    const progress = Math.max(0, Math.min(1, 1 - (distance / maxDistance)));
+    updateWindow("Pathfinding ... ", getProgressBar(progress));
+}
+//////
+
+
+function arrayToList(array) {
+    return Java.to(array, 'java.lang.String[]');
+}
+function main() {
+    while (!shouldStop()) {
+        updateWindow("Searching ...", getProgressBar(0));
+
+        //Search Inventory for WaterSkin
+        let waterskin = PBotUtils.playerInventory(ui).getInventoryItemsByNames("Waterskin").size();
+        let stone = PBotUtils.playerInventory(ui).getInventoryItemsByNames("Feldspar").size();
+        PBotUtils.sysMsg(ui, "Waterskin: " + waterskin, 20, 234, 23);
+        PBotUtils.sysMsg(ui, "stone: " + stone, 20, 234, 23);
+
+
+        //Find water source
+        const waterSource = PBotGobAPI.findGobByNames(ui, parseFloat(DEFAULT_RADIUS), WATER_GFX);
+        if (!waterSource) {
+            PBotUtils.sysMsg(ui, "No water source", 200, 23, 23);
+            updateWindow("No water source found", 0);
+            break;
+        }
+        
+        //Pathfind to barrel
+        pfToGob(waterSource);
+        let distance = distanceToGob(waterSource);
+        while (distance > 11 && !shouldStop()) {
+            distance = distanceToGob(waterSource);
+            updateProgressBar(distance);
+            updateWindow("Moving", getProgressBar(distance / DEFAULT_RADIUS));
+            PBotUtils.sleep(100);
+            if (!PBotGobAPI.player(ui).isMoving()) {
+                updateWindow("Interupted", getProgressBar(distance / DEFAULT_RADIUS));
+                PBotUtils.sysMsg(ui, "Interupted, I will pause for 3 seconds");
+                PBotUtils.sleep(3000);
+                break;
+            }
+        }
+        if (distance <= 15) {
+            updateWindow("Next to Object", getProgressBar(1));
+            PBotUtils.sleep(SLEEP_TIME);
+        }
+
+
+
+
+
+        updateRadius(DEFAULT_RADIUS);
+    }
+    PBotUtils.sleep(1500);
+    window.close();
+    PBotUtils.sysMsg(ui, "Bot finished!", 20, 234, 23);
+}
+
+
+function shouldStop() {
+    return stop || window.closed();
+}
