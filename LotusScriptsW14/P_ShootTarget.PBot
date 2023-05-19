@@ -1,0 +1,252 @@
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotCharacterAPI = Java.type('haven.purus.pbot.PBotCharacterAPI');
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+const javaListToArray = (javalist) => {
+    const ret = [];
+    for (let i = 0; i < javalist.size(); i++)
+        ret.push(javalist.get(i));
+    return ret;
+};
+function info(s, l) {
+    if (l <= messageLevel)
+        PBotUtils.sysMsg(ui, s + "", 128, 192, 200);
+}
+function sinfo(s, l) {
+    if (l <= messageLevel)
+        PBotUtils.sysMsg(ui, s + "", 50, 200, 60);
+}
+
+const VERSIONNAME = "1.0"
+const WINDOWNAME = "BatMan";
+const HOWTO = "HOWTO:\n  1. Use checkboxes\n  2. press start \n 3. Profit";
+const TICK = 200;
+
+const messageLevel = 4;
+var stopmsg = [];
+var start = Date.now();
+var radius = 200;
+
+////////////////
+const windowHeight = 230;
+const windowWidth = 180;
+const window = PBotUtils.PBotWindow(ui, WINDOWNAME, windowHeight, windowWidth, ScriptID);
+//First Screen
+const btnStart = window.addButton("btnStartClick", "Start", 80, 25, 10);
+const howtoBtn = window.addButton("howtoBtnClick", "?", 25, 104, 10);
+const devider = window.addLabel("_____________", 25, 25);
+
+const radiusLabel = window.addLabel("Search Radius: " + radius, 10, 40);
+const cboxArrow = window.addCheckbox("checkboxArrow", "Pick Arrows", false, 10, 60);
+const cboxShoot = window.addCheckbox("checkboxShoot", "Shoot", false, 10, 70);
+
+function checkboxArrow() { }
+function checkboxShoot() { }
+
+//Adding default values
+cboxArrow.setValue(true);
+btnStart.changeColor(30, 200, 45);
+    
+//Second Screen (After user presses start)
+const btnStartClick = () => {
+    const infoArrow = window.addLabel("Arrow: " + cboxArrow.getValue(), 10, 85);
+    
+    btnStart.hide();
+    howtoBtn.hide();
+    devider.hide();
+    radiusLabel.hide();
+    cboxArrow.hide();   
+    
+    infoArrow.show();
+    main()
+    btnStart.show();
+    howtoBtn.show();
+    devider.show();
+    radiusLabel.show();
+    cboxArrow.show();
+
+    infoArrow.hide();
+    info("Bot Done!", 0);
+}
+const howtoBtnClick = () => {
+    info(WINDOWNAME + " " + VERSIONNAME + " " + HOWTO, 0)
+} 
+
+///////////////
+let stop = false;
+const shouldStop = () => {
+    return stop || window.closed();
+};
+const main = () => {
+    do {
+            //window
+            const statusLbl = window.addLabel("Initializing...", 10, 10);
+            const progressLbl = window.addLabel("", 10, 25);
+            const estLbl = window.addLabel("Estimated time:", 10, 40);
+            const timeLbl = window.addLabel("00", 10, 60);
+            const devider = window.addLabel("_______________", 25, 65);
+
+
+            let gob = returnAnimal(radius);
+            let arrow = returnArrow(radius);
+            if (gob == null && arrow == null) {
+                PBotUtils.sysMsg(ui, "Found no arrows or animals");
+                window.closeWindow();
+                stop = true;
+            }
+
+            if (cboxArrow.getValue()) {
+                let arrow = returnArrow(radius);
+                if (arrow == null) {
+                    PBotUtils.sysMsg(ui, "Found no arrows");
+                    window.closeWindow();
+                    stop = true;
+                } else {
+                    PBotUtils.sysMsg(ui, "Picking arrows");
+                    arrow.doClick(3, 0);
+                }
+            }
+            if (cboxShoot.getValue()) {
+                let target = returnTarget(radius);
+                if (target == null) {
+                    PBotUtils.sysMsg(ui, "Found no targets");
+                    window.closeWindow();
+                    stop = true;
+                }
+                else {
+                    PBotUtils.sysMsg(ui, "Shooting target", 222, 122, 22);
+                    target.doClick(3, 0);
+                }
+            }
+
+            //destoy the window components
+            statusLbl.destroy();
+            progressLbl.destroy();
+            estLbl.destroy();
+            timeLbl.destroy();
+            devider.destroy();
+            PBotUtils.sleep(200);
+            PBotUtils.sysMsg(ui, "done! (close window to exit)", 222, 12, 22);
+    } while (!stop && !window.closed());
+PBotUtils.sysMsg(ui, "-" + WINDOWNAME + " " + VERSIONNAME + " closed-", 222, 12, 22);
+       
+    
+    function returnTarget(radius) {
+        let archeryGobs = new Array('gfx/terobjs/archerytarget');
+        let gob = PBotGobAPI.findGobByNames(ui, radius, archeryGobs[0]);
+        if (gob) {
+            return gob;
+        }
+
+    }
+    function returnArrow(radius) {
+        let arrowGobs = new Array('gfx/terobjs/items/arrow');
+        for (var i = 0; i < arrowGobs.length; i++) {
+            let gob = PBotGobAPI.findGobByNames(ui, radius, arrowGobs[i]);
+            if (gob) {
+                return gob;
+            }
+        }
+    }
+    function returnAnimal(radius) {
+        let animalGobs = new Array('gfx/kritter/boar/boar', 'gfx/kritter/wolverine/wolverine',
+            'gfx/kritter/otter/otter', 'gfx/kritter/cattle/cattle', 'gfx/kritter/fox/fox',
+            'gfx/kritter/reddeer/reddeer', 'gfx/kritter/beaver/beaver', 'gfx/kritter/badger/badger',
+            'gfx/kritter/sheep/sheep');
+        for (var i = 0; i < animalGobs.length; i++) {
+            let gob = PBotGobAPI.findGobByNames(ui, radius, animalGobs[i]);
+            if (gob) {
+                return gob;
+            }
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    function waitForIdle() {
+        const maxWaitTICKs = 4;
+        const TICK = 100;
+        let idleCounter = maxWaitTICKs;
+        while (idleCounter >= 0 && !shouldStop()) {
+            if (PBotUtils.getHourglass(ui) == -1)
+                idleCounter--;            
+            else {
+                idleCounter = maxWaitTICKs;
+            }
+            if (PBotCharacterAPI.getStamina(ui) < 40) PBotUtils.drink(ui, true); //drink water if stamina is low
+            PBotUtils.sleep(TICK);
+        }
+    }
+    function pfToGob(gob) {
+        // wait for player to start moving, then for player to stop
+        do {
+            if (!PBotGobAPI.player(ui).isMoving()) { //Standing still
+                if (!gob.pfClick(1, 0)) {
+                    PBotUtils.sysMsg(ui, "Cant find a way to path to the object");
+                }
+                PBotUtils.sleep(300);
+            }
+            if (PBotGobAPI.player(ui).isMoving()) {
+                PBotUtils.sysMsg(ui, "movin' I am waiting 300ms");
+                PBotUtils.sleep(300);
+            }
+        } while (distanceToGob > 11);
+    }
+    function distanceToGob(gob) {
+        const gobPos = gob.getRcCoords().floor();
+        
+        const distanceX = gobPos.x - playerPos.x;
+        const distanceY = gobPos.y - playerPos.y;
+        const total = pythagorean(distanceX, distanceY);
+        return total;
+    }
+    function pythagorean(sideA, sideB) {
+        return Math.sqrt(Math.pow(sideA, 2) + Math.pow(sideB, 2));
+    }    
+    function irq() {
+        if (PBotCharacterAPI.getStamina(ui) < 35) err("Out of stamina");
+        if (PBotCharacterAPI.getEnergy(ui) < 35) err("Out of energy");
+        
+        if (PBotWindowAPI.getWindow(ui, WINDOWNAME) == null) {
+            info("Stopped", 0);
+            return true;
+        }
+        if (stopmsg.length == 0) {
+        return false;
+        } else {
+        let errstr = "⚠ ";
+        for (let r of stopmsg) {
+        errstr += r + " ⚠ ";
+        }
+        PBotUtils.sysMsg(ui, errstr, 255, 128, 0);
+        return true;
+        }
+    }
+    function err(s) {
+    stopmsg.push(s);
+    }
+    function info(s, l) {
+        if (l <= messageLevel)
+        PBotUtils.sysMsg(ui, s + "", 128, 192, 200);
+    }
+}
