@@ -37,6 +37,7 @@ function selectStockpiles(){
 	const gobs = PBotUtils.gobsInArea(ui, PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
 	for(let i=0; i<gobs.size(); i++) {
 		if(gobs[i].getResname() === stockpileName)
+			PBotUtils.sysMsg(ui, "gobs[i].getResname() === stockpileName" + gobs[i].getResname() + "=" + stockpileName);
 			stockpiles.push(gobs[i]);
 	}
 	return stockpiles;
