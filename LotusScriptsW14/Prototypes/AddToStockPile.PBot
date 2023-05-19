@@ -6,8 +6,10 @@ const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
 const window = PBotUtils.PBotWindow(ui, "itempickup", 50, 110, ScriptID);
 const btnStart = window.addButton("btnStartClick", "Start", 30, 35, 30);
 let stop;
-let stockpileName = 'gfx/terobjs/stockpile-flaxfibre';
-let item = "FlaxFibre";
+//let stockpileName = 'gfx/terobjs/stockpile-flaxfibre';
+let stockpileName = 'gfx/terobjs/stockpile-stone';
+//let item = "FlaxFibre";
+let item = "Basalt";
 
 function selectStockpiles(){
 	let stockpiles = [];
@@ -22,7 +24,7 @@ function selectStockpiles(){
 }
 
 function pickup(){
-
+	//pickupging the item related to stockpile
 }
 
 
@@ -37,7 +39,7 @@ const main = () => {
 		let itemsStoredLabel = window.addLabel("item stored: " + itemsStored, 10, 10);
 		let itemStockpilesLabel = window.addLabel("stockpiles left: " + itemStockpiles.length, 10, 30);
 		if(itemStockpiles.length === 0) {
-			PBotUtils.sysMsg(ui, "Out of stockpiles!");
+			PBotUtils.sysMsg(ui, "Out of stockpiles! ("  + stockpileName + ")"	 );
 			stop = true;
 			break;
 		}

@@ -1,13 +1,29 @@
 const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
 const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
-const PBotCharacterAPI = Java.type("haven.purus.pbot.PBotCharacterAPI");
+const PBotCharacterAPI = Java.type('haven.purus.pbot.PBotCharacterAPI');
 const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
 const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
+
 const window = PBotUtils.PBotWindow(ui, "StoneDigger", 50, 110, ScriptID);
 const btnStart = window.addButton("btnStartClick", "Start", 30, 35, 30);
 let stop;
-let stockpileName = 'gfx/terobjs/stockpile-clay';
+let stockpileName = 'gfx/terobjs/stockpile-stone';
 let stone = "Basalt";
+
+// Helper function to handle spacebar press
+const handleSpacebarPress = () => {
+	PBotUtils.sysMsg(ui, "Spacebar!");
+};
+
+const addSpacebarListener = () => {
+	const canvas = ui.gui.map.wdgmsg;
+	const listener = (ev) => {
+		if (ev.keyCode === 32) { // Check if the pressed key is the spacebar (key code 32)
+			handleSpacebarPress();
+		}
+	};
+	canvas.addKeyListener(listener);
+};
 
 
 function selectTiles(){
@@ -64,7 +80,7 @@ const main = () => {
 		let stoneStoredLabel = window.addLabel("stone stored: " + stoneStored, 10, 10);
 		let stoneStockpilesLabel = window.addLabel("stockpiles left: " + stoneStockpiles.length, 10, 30);
 		if(stoneStockpiles.length === 0) {
-			PBotUtils.sysMsg(ui, "Out of stockpiles!");
+			PBotUtils.sysMsg(ui, "Out of stockpiles! (" + stockpileName + ")");
 			stop = true;
 			break;
 		}
@@ -121,6 +137,7 @@ const main = () => {
 		stoneStockpilesLabel.destroy();
 		PBotUtils.sleep(500);
 	} while (!stop && !window.closed());
+	window.removeEventListener("keydown", spacebarListener);
 	PBotUtils.sysMsg(ui, "Finished! Total stone dug: " + stoneStored);
 }
 
