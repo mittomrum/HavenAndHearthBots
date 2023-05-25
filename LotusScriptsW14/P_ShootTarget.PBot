@@ -1,252 +1,143 @@
-const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui(); 
+const PBot = Java.type("haven.purus.pbot.PBotAPI");
 const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
-const PBotCharacterAPI = Java.type('haven.purus.pbot.PBotCharacterAPI');
 const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
-const javaListToArray = (javalist) => {
-    const ret = [];
-    for (let i = 0; i < javalist.size(); i++)
-        ret.push(javalist.get(i));
-    return ret;
-};
-function info(s, l) {
-    if (l <= messageLevel)
-        PBotUtils.sysMsg(ui, s + "", 128, 192, 200);
+const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
+
+let stop;
+const cooldownTime = 2000;
+const radius = 200;
+windowWidth = 170;
+windowHeight = 140;
+const window = PBotUtils.PBotWindow(ui, "", windowWidth, windowHeight, ScriptID);
+const radiusLabel = window.addLabel("Search Radius: ", 10, 10);
+const devider = window.addLabel("_______________", 25, 30);
+const textEntry = window.addTextEntry(35, radius.toString(), 90, 5);
+const cboxArrowPick = window.addCheckbox("checkboxPickArrows", "Collect Arrows", false, 10, 110);
+window.addLabel("_______________", 20, 120);
+const btnStart = window.addButton("btnStartClick", "Start", 70, 35, 145);
+
+//Second Window
+const infoRadius = window.addLabel("Radius: " + radius, 10, 20);
+const statusLbl = window.addLabel("Status: Idle", 10, 105);
+const progressBarLbl = window.addLabel("Progress: [----------]", 10, 125);
+infoRadius.hide();
+statusLbl.hide();
+progressBarLbl.hide();
+
+
+const updateWindow = (status, progress) => {
+    statusLbl.settext("Status: " + status);
+    progressBarLbl.settext("Progress: " + progress);
 }
-function sinfo(s, l) {
-    if (l <= messageLevel)
-        PBotUtils.sysMsg(ui, s + "", 50, 200, 60);
+function getProgressBar(progress) {
+    const numDots = Math.floor(progress * 10);
+    const progressBar = "[" + ">".repeat(numDots) + "-".repeat(10 - numDots) + "]";
+    return progressBar;
 }
-
-const VERSIONNAME = "1.0"
-const WINDOWNAME = "BatMan";
-const HOWTO = "HOWTO:\n  1. Use checkboxes\n  2. press start \n 3. Profit";
-const TICK = 200;
-
-const messageLevel = 4;
-var stopmsg = [];
-var start = Date.now();
-var radius = 200;
-
-////////////////
-const windowHeight = 230;
-const windowWidth = 180;
-const window = PBotUtils.PBotWindow(ui, WINDOWNAME, windowHeight, windowWidth, ScriptID);
-//First Screen
-const btnStart = window.addButton("btnStartClick", "Start", 80, 25, 10);
-const howtoBtn = window.addButton("howtoBtnClick", "?", 25, 104, 10);
-const devider = window.addLabel("_____________", 25, 25);
-
-const radiusLabel = window.addLabel("Search Radius: " + radius, 10, 40);
-const cboxArrow = window.addCheckbox("checkboxArrow", "Pick Arrows", false, 10, 60);
-const cboxShoot = window.addCheckbox("checkboxShoot", "Shoot", false, 10, 70);
-
-function checkboxArrow() { }
-function checkboxShoot() { }
 
 //Adding default values
-cboxArrow.setValue(true);
-btnStart.changeColor(30, 200, 45);
-    
-//Second Screen (After user presses start)
+cboxArrowPick.setValue(true);
+
 const btnStartClick = () => {
-    const infoArrow = window.addLabel("Arrow: " + cboxArrow.getValue(), 10, 85);
-    
-    btnStart.hide();
-    howtoBtn.hide();
-    devider.hide();
-    radiusLabel.hide();
-    cboxArrow.hide();   
-    
-    infoArrow.show();
-    main()
-    btnStart.show();
-    howtoBtn.show();
-    devider.show();
-    radiusLabel.show();
-    cboxArrow.show();
+    stop = false;
+    radiusLabel.destroy();
+    devider.destroy();
+    btnStart.destroy();
+    textEntry.destroy();
+    cboxArrowPick.destroy();
 
-    infoArrow.hide();
-    info("Bot Done!", 0);
+    infoRadius.show();
+    statusLbl.show();
+    progressBarLbl.show();
+    main();
 }
-const howtoBtnClick = () => {
-    info(WINDOWNAME + " " + VERSIONNAME + " " + HOWTO, 0)
-} 
 
-///////////////
-let stop = false;
-const shouldStop = () => {
-    return stop || window.closed();
-};
 const main = () => {
+    PBotUtils.sysMsg(ui, "Bot Start", 127, 255, 0);
+    const main_startTime = Date.now();
+    let shootTimer_Start = 0; // Declare the shoot timer variable
+
     do {
-            //window
-            const statusLbl = window.addLabel("Initializing...", 10, 10);
-            const progressLbl = window.addLabel("", 10, 25);
-            const estLbl = window.addLabel("Estimated time:", 10, 40);
-            const timeLbl = window.addLabel("00", 10, 60);
-            const devider = window.addLabel("_______________", 25, 65);
+        let loop_startTime = Date.now();
+        let AnimalGob = searchForAnimals(1);
 
-
-            let gob = returnAnimal(radius);
-            let arrow = returnArrow(radius);
-            if (gob == null && arrow == null) {
-                PBotUtils.sysMsg(ui, "Found no arrows or animals");
-                window.closeWindow();
-                stop = true;
-            }
-
-            if (cboxArrow.getValue()) {
-                let arrow = returnArrow(radius);
-                if (arrow == null) {
-                    PBotUtils.sysMsg(ui, "Found no arrows");
-                    window.closeWindow();
+        if (AnimalGob == null) {
+            if (cboxArrowPick.getValue()) {
+                let gob = searchForArrows(radius);
+                if (gob == null) {
+                    PBotUtils.sysMsg(ui, "Found no Animals", 220, 20, 60);
+                    PBotUtils.sysMsg(ui, "Found no Arrows", 255, 0, 0);
                     stop = true;
                 } else {
-                    PBotUtils.sysMsg(ui, "Picking arrows");
-                    arrow.doClick(3, 0);
+                    gob.doClick(3, 0);
                 }
             }
-            if (cboxShoot.getValue()) {
-                let target = returnTarget(radius);
-                if (target == null) {
-                    PBotUtils.sysMsg(ui, "Found no targets");
-                    window.closeWindow();
-                    stop = true;
-                }
-                else {
-                    PBotUtils.sysMsg(ui, "Shooting target", 222, 122, 22);
-                    target.doClick(3, 0);
-                }
+        } else {
+            let timelapsed = Date.now() - shootTimer_Start;
+            if (timelapsed >= cooldownTime) {
+                PBotUtils.sysMsg(ui, "Shooting: " + AnimalGob.getResname(), 12, 231, 54);
+                // Perform shooting logic here
+                shootTimer_Start = Date.now();
+            } else {
+                PBotUtils.sysMsg(ui, "cooldownTime (" + (timelapsed+1) +  ")", 12, 231, 54);
             }
 
-            //destoy the window components
-            statusLbl.destroy();
-            progressLbl.destroy();
-            estLbl.destroy();
-            timeLbl.destroy();
-            devider.destroy();
-            PBotUtils.sleep(200);
-            PBotUtils.sysMsg(ui, "done! (close window to exit)", 222, 12, 22);
+            updateWindow("Pathfinding", getProgressBar(0.5));
+            const target = window.addLabel(AnimalGob.getResname().toString(), 10, 10);
+            const targetDistance = window.addLabel("Distance: " + Math.floor(distanceToGob(AnimalGob)), 10, 30);
+        }
+
+        let func_startTime = Date.now();
+        let func_timeSpentWaiting = 0;
+
+        PBotUtils.sysMsg(ui, "Close Window To Stop (1000ms)", 245, 222, 179);
+        PBotUtils.sleep(300);
     } while (!stop && !window.closed());
-PBotUtils.sysMsg(ui, "-" + WINDOWNAME + " " + VERSIONNAME + " closed-", 222, 12, 22);
-       
-    
-    function returnTarget(radius) {
-        let archeryGobs = new Array('gfx/terobjs/archerytarget');
-        let gob = PBotGobAPI.findGobByNames(ui, radius, archeryGobs[0]);
+
+    window.closeWindow();
+    PBotUtils.sysMsg(ui, "Bot finished! (closing window)", 255, 165, 0);
+};
+
+
+
+function searchForAnimals(radius) {
+    let animalGobs = [
+        'gfx/terobjs/archerytarget',
+        'gfx/kritter/boar/boar',
+        'gfx/kritter/wolverine/wolverine',
+        'gfx/kritter/otter/otter',
+        'gfx/kritter/cattle/cattle',
+        'gfx/kritter/fox/fox',
+        'gfx/kritter/reddeer/reddeer',
+        'gfx/kritter/beaver/beaver',
+        'gfx/kritter/badger/badger',
+        'gfx/kritter/sheep/sheep',
+    ];
+    for (var i = 0; i < animalGobs.length; i++) {
+        let gob = PBotGobAPI.findGobByNames(ui, parseFloat(radius), animalGobs[i]);
         if (gob) {
             return gob;
         }
-
-    }
-    function returnArrow(radius) {
-        let arrowGobs = new Array('gfx/terobjs/items/arrow');
-        for (var i = 0; i < arrowGobs.length; i++) {
-            let gob = PBotGobAPI.findGobByNames(ui, radius, arrowGobs[i]);
-            if (gob) {
-                return gob;
-            }
-        }
-    }
-    function returnAnimal(radius) {
-        let animalGobs = new Array('gfx/kritter/boar/boar', 'gfx/kritter/wolverine/wolverine',
-            'gfx/kritter/otter/otter', 'gfx/kritter/cattle/cattle', 'gfx/kritter/fox/fox',
-            'gfx/kritter/reddeer/reddeer', 'gfx/kritter/beaver/beaver', 'gfx/kritter/badger/badger',
-            'gfx/kritter/sheep/sheep');
-        for (var i = 0; i < animalGobs.length; i++) {
-            let gob = PBotGobAPI.findGobByNames(ui, radius, animalGobs[i]);
-            if (gob) {
-                return gob;
-            }
-        }
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    function waitForIdle() {
-        const maxWaitTICKs = 4;
-        const TICK = 100;
-        let idleCounter = maxWaitTICKs;
-        while (idleCounter >= 0 && !shouldStop()) {
-            if (PBotUtils.getHourglass(ui) == -1)
-                idleCounter--;            
-            else {
-                idleCounter = maxWaitTICKs;
-            }
-            if (PBotCharacterAPI.getStamina(ui) < 40) PBotUtils.drink(ui, true); //drink water if stamina is low
-            PBotUtils.sleep(TICK);
-        }
-    }
-    function pfToGob(gob) {
-        // wait for player to start moving, then for player to stop
-        do {
-            if (!PBotGobAPI.player(ui).isMoving()) { //Standing still
-                if (!gob.pfClick(1, 0)) {
-                    PBotUtils.sysMsg(ui, "Cant find a way to path to the object");
-                }
-                PBotUtils.sleep(300);
-            }
-            if (PBotGobAPI.player(ui).isMoving()) {
-                PBotUtils.sysMsg(ui, "movin' I am waiting 300ms");
-                PBotUtils.sleep(300);
-            }
-        } while (distanceToGob > 11);
-    }
-    function distanceToGob(gob) {
-        const gobPos = gob.getRcCoords().floor();
-        
-        const distanceX = gobPos.x - playerPos.x;
-        const distanceY = gobPos.y - playerPos.y;
-        const total = pythagorean(distanceX, distanceY);
-        return total;
-    }
-    function pythagorean(sideA, sideB) {
-        return Math.sqrt(Math.pow(sideA, 2) + Math.pow(sideB, 2));
-    }    
-    function irq() {
-        if (PBotCharacterAPI.getStamina(ui) < 35) err("Out of stamina");
-        if (PBotCharacterAPI.getEnergy(ui) < 35) err("Out of energy");
-        
-        if (PBotWindowAPI.getWindow(ui, WINDOWNAME) == null) {
-            info("Stopped", 0);
-            return true;
-        }
-        if (stopmsg.length == 0) {
-        return false;
-        } else {
-        let errstr = "⚠ ";
-        for (let r of stopmsg) {
-        errstr += r + " ⚠ ";
-        }
-        PBotUtils.sysMsg(ui, errstr, 255, 128, 0);
-        return true;
-        }
-    }
-    function err(s) {
-    stopmsg.push(s);
-    }
-    function info(s, l) {
-        if (l <= messageLevel)
-        PBotUtils.sysMsg(ui, s + "", 128, 192, 200);
     }
 }
+function searchForArrows(radius) {
+    let gob = PBotGobAPI.findGobByNames(ui, parseFloat(radius), 'gfx/terobjs/items/arrow');
+    if (gob) {
+        return gob;
+    }
+}
+
+
+function distanceToGob(gob) {
+    const gobPos = gob.getRcCoords().floor();
+    const playerPos = PBotGobAPI.player(ui).getRcCoords().floor();
+    const distanceX = gobPos.x - playerPos.x;
+    const distanceY = gobPos.y - playerPos.y;
+    const total = pythagorean(distanceX, distanceY);
+    return total;
+}
+function pythagorean(sideA, sideB) {
+    return Math.sqrt(Math.pow(sideA, 2) + Math.pow(sideB, 2));
+}
+function checkboxPickArrows() { }
