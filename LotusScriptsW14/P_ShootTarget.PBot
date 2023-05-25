@@ -4,63 +4,63 @@ const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
 const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
 const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
 
+
+
+
+const VERSIONNAME = "1.0"
+const WINDOWNAME = "ShootTarget";
+
+
+
 let stop;
 const cooldownTime = 2000;
-const radius = 200;
+const rangeofshot = 100;
+const radius = 150;
 windowWidth = 170;
 windowHeight = 140;
-const window = PBotUtils.PBotWindow(ui, "", windowWidth, windowHeight, ScriptID);
-const radiusLabel = window.addLabel("Search Radius: ", 10, 10);
-const devider = window.addLabel("_______________", 25, 30);
-const textEntry = window.addTextEntry(35, radius.toString(), 90, 5);
-const cboxArrowPick = window.addCheckbox("checkboxPickArrows", "Collect Arrows", false, 10, 110);
+const window = PBotUtils.PBotWindow(ui, WINDOWNAME, windowWidth, windowHeight, ScriptID);
+const infoRadius = window.addLabel("Radius: " + radius, 10, 10);
+const statusLbl = window.addLabel("Status: Idle", 10, 20);
+const progressBarLbl = window.addLabel("Progress: [----------]", 10, 30);
+const cooldownLbl = window.addLabel("Cooldown: 0", 10, 70);
 window.addLabel("_______________", 20, 120);
-const btnStart = window.addButton("btnStartClick", "Start", 70, 35, 145);
+const cboxArrowPick = window.addCheckbox("checkboxPickArrows", "Collect Arrows", false, 10, 110);
 
-//Second Window
-const infoRadius = window.addLabel("Radius: " + radius, 10, 20);
-const statusLbl = window.addLabel("Status: Idle", 10, 105);
-const progressBarLbl = window.addLabel("Progress: [----------]", 10, 125);
-infoRadius.hide();
-statusLbl.hide();
-progressBarLbl.hide();
-
+//Adding default values
+cboxArrowPick.setValue(true);
 
 const updateWindow = (status, progress) => {
     statusLbl.settext("Status: " + status);
     progressBarLbl.settext("Progress: " + progress);
 }
+function convertCooldownToProgress(cooldownTimer) {
+  const progress = Math.min(1, cooldownTimer / cooldownTime);
+  return progress;
+}
+
+
 function getProgressBar(progress) {
     const numDots = Math.floor(progress * 10);
     const progressBar = "[" + ">".repeat(numDots) + "-".repeat(10 - numDots) + "]";
     return progressBar;
 }
 
-//Adding default values
-cboxArrowPick.setValue(true);
 
-const btnStartClick = () => {
-    stop = false;
-    radiusLabel.destroy();
-    devider.destroy();
-    btnStart.destroy();
-    textEntry.destroy();
-    cboxArrowPick.destroy();
 
-    infoRadius.show();
-    statusLbl.show();
-    progressBarLbl.show();
-    main();
-}
 
 const main = () => {
+    stop = false;
+    let target = null;
+    let targetDistance = null;
+
     PBotUtils.sysMsg(ui, "Bot Start", 127, 255, 0);
     const main_startTime = Date.now();
     let shootTimer_Start = 0; // Declare the shoot timer variable
 
     do {
+        updateWindow("Starting Loop", getProgressBar(0));
         let loop_startTime = Date.now();
-        let AnimalGob = searchForAnimals(1);
+        let AnimalGob = searchForAnimals(radius);
 
         if (AnimalGob == null) {
             if (cboxArrowPick.getValue()) {
@@ -70,35 +70,58 @@ const main = () => {
                     PBotUtils.sysMsg(ui, "Found no Arrows", 255, 0, 0);
                     stop = true;
                 } else {
-                    gob.doClick(3, 0);
+                    updateWindow("Picking Up Arrow", getProgressBar(0.5));
+                    gob.doClick(3, 0);    
+                    while (!stop && !window.closed() && PBotGobAPI.player(ui).isMoving()){
+                        updateWindow("Waiting for player to stop moving", getProgressBar(0.75));
+                        PBotUtils.sleep(500);
+                        PBotUtils.sysMsg(ui, "Waiting for player to pick up arrow", 175,238,238);
+                    }
+                    PBotUtils.sleep(50);
                 }
             }
         } else {
             let timelapsed = Date.now() - shootTimer_Start;
+            const progress = convertCooldownToProgress(timelapsed);
+            updateWindow("Cooldown Timer:", getProgressBar(progress));
+
             if (timelapsed >= cooldownTime) {
-                PBotUtils.sysMsg(ui, "Shooting: " + AnimalGob.getResname(), 12, 231, 54);
-                // Perform shooting logic here
-                shootTimer_Start = Date.now();
-            } else {
-                PBotUtils.sysMsg(ui, "cooldownTime (" + (timelapsed+1) +  ")", 12, 231, 54);
+                let distance = distanceToGob(AnimalGob);
+                if (distance < rangeofshot) {
+                    // Perform shooting logic here
+                    updateWindow("Shooting:", getProgressBar(progress));
+                    PBotUtils.sysMsg(ui, "Shooting: " + AnimalGob.getResname(), 255,105,180);
+                    PBotUtils.sleep(1000);
+                    shootTimer_Start = Date.now();
+                } else {
+                    PBotUtils.sysMsg(ui, "To far away from target: " + distance + "  max distance: " + rangeofshot, 255,20,147);
+                    updateWindow("To far away!", getProgressBar(0));
+                }
             }
 
-            updateWindow("Pathfinding", getProgressBar(0.5));
-            const target = window.addLabel(AnimalGob.getResname().toString(), 10, 10);
-            const targetDistance = window.addLabel("Distance: " + Math.floor(distanceToGob(AnimalGob)), 10, 30);
+
+            if (target != null) {
+                target.destroy();
+            }
+
+            if (targetDistance != null) {
+                targetDistance.destroy();
+            }
+
+            target = window.addLabel(AnimalGob.getResname().toString(), 10, 50);
+            targetDistance = window.addLabel("Distance: " + Math.floor(distanceToGob(AnimalGob)), 10, 60);        
+            PBotUtils.sleep(50);            
         }
 
         let func_startTime = Date.now();
         let func_timeSpentWaiting = 0;
-
-        PBotUtils.sysMsg(ui, "Close Window To Stop (1000ms)", 245, 222, 179);
-        PBotUtils.sleep(300);
+        PBotUtils.sleep(50);
     } while (!stop && !window.closed());
 
     window.closeWindow();
     PBotUtils.sysMsg(ui, "Bot finished! (closing window)", 255, 165, 0);
 };
-
+main();
 
 
 function searchForAnimals(radius) {
