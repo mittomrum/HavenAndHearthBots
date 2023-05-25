@@ -2,6 +2,7 @@ const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
 const PBot = Java.type("haven.purus.pbot.PBotAPI");
 const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
 const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+const PBotCharacterAPI = Java.type('haven.purus.pbot.PBotCharacterAPI');
 const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
 
 
@@ -13,9 +14,10 @@ const WINDOWNAME = "ShootTarget";
 
 
 let stop;
-const cooldownTime = 2000;
+const cooldownTime = 3400;
 const rangeofshot = 100;
-const radius = 150;
+const radius = 100;
+const arrowPickupRadius = 150;
 windowWidth = 170;
 windowHeight = 140;
 const window = PBotUtils.PBotWindow(ui, WINDOWNAME, windowWidth, windowHeight, ScriptID);
@@ -91,8 +93,13 @@ const main = () => {
                     // Perform shooting logic here
                     updateWindow("Shooting:", getProgressBar(progress));
                     PBotUtils.sysMsg(ui, "Shooting: " + AnimalGob.getResname(), 255,105,180);
-                    PBotUtils.sleep(1000);
-                    shootTimer_Start = Date.now();
+                    PBotCharacterAPI.doAct(ui, "shoot");
+                    AnimalGob.doClick(1, 0);
+                    if (PBotUtils.getHourglass(ui) !== -1){
+                        PBotUtils.sysMsg(ui, "Reseting timer", 255,20,147);
+                        PBotCharacterAPI.cancelAct(ui);
+                        shootTimer_Start = Date.now();
+                    }
                 } else {
                     PBotUtils.sysMsg(ui, "To far away from target: " + distance + "  max distance: " + rangeofshot, 255,20,147);
                     updateWindow("To far away!", getProgressBar(0));
@@ -125,18 +132,24 @@ main();
 
 
 function searchForAnimals(radius) {
-    let animalGobs = [
-        'gfx/terobjs/archerytarget',
-        'gfx/kritter/boar/boar',
-        'gfx/kritter/wolverine/wolverine',
-        'gfx/kritter/otter/otter',
-        'gfx/kritter/cattle/cattle',
-        'gfx/kritter/fox/fox',
-        'gfx/kritter/reddeer/reddeer',
-        'gfx/kritter/beaver/beaver',
-        'gfx/kritter/badger/badger',
-        'gfx/kritter/sheep/sheep',
-    ];
+let animalGobs = [
+    'gfx/terobjs/archerytarget',
+    'gfx/kritter/boar/boar',
+    'gfx/kritter/wolverine/wolverine',
+    'gfx/kritter/otter/otter',
+    'gfx/kritter/cattle/cattle',
+    'gfx/kritter/fox/fox',
+    'gfx/kritter/reddeer/reddeer',
+    'gfx/kritter/beaver/beaver',
+    'gfx/kritter/badger/badger',
+    'gfx/kritter/sheep/sheep',
+    'gfx/kritter/bear/bear',
+    'gfx/kritter/deer/deer',
+    'gfx/kritter/horse/horse',
+    'gfx/kritter/wolf/wolf',
+    'gfx/kritter/moose/moose',
+    'gfx/kritter/swan/swan',
+];
     for (var i = 0; i < animalGobs.length; i++) {
         let gob = PBotGobAPI.findGobByNames(ui, parseFloat(radius), animalGobs[i]);
         if (gob) {
@@ -145,7 +158,7 @@ function searchForAnimals(radius) {
     }
 }
 function searchForArrows(radius) {
-    let gob = PBotGobAPI.findGobByNames(ui, parseFloat(radius), 'gfx/terobjs/items/arrow');
+    let gob = PBotGobAPI.findGobByNames(ui, parseFloat(arrowPickupRadius), 'gfx/terobjs/items/arrow');
     if (gob) {
         return gob;
     }
