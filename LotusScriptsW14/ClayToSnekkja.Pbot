@@ -1,0 +1,346 @@
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotCharacterAPI = Java.type("haven.purus.pbot.PBotCharacterAPI");
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
+
+let ITEMNAME = "Ball Clay";
+let FREEINVSLOTS = 10;
+let stockpileName = 'gfx/terobjs/stockpile-clay';
+
+
+var start = Date.now();
+const WINDOWNAME = "ClayToSnekkja";
+const window = PBotUtils.PBotWindow(ui, WINDOWNAME, 120, 210, ScriptID); // Height then Width
+let clayStoredLabel = window.addLabel("clay stored: ", 10, 10); //Padding Left, Padding Top
+let clayStockpilesLabel = window.addLabel("stockpiles left: ", 10, 30); //Padding Left, Padding Top
+let seperatorLabel = window.addLabel("-----------------", 10, 50); //Padding Left, Padding Top
+let statusLabel = window.addLabel("Current Task: ", 10, 60); //Padding Left, Padding Top
+const btnStart = window.addButton("btnStartClick", "Start", 30, 35, 90); //Size, Padding Left, Padding Top
+
+const main = () => {	
+	PBotUtils.sysMsg(ui, "Bot Start!", 0, 204, 21);
+	let stop = false;
+	let clayInvAmount = PBotUtils.playerInventory(ui).getInventoryItemsByNames(ITEMNAME).size();
+	let clayStored = 0;
+
+	statusLabel.setText("Select ClayTiles");
+	let clayTiles = selectClayTiles();
+	statusLabel.setText("");
+
+	statusLabel.setText("Select Stockpiles");
+	let clayStockpiles = selectStockpiles();
+    clayStockpilesLabel.setText("stockpiles left: " + clayStockpiles.length);
+
+	while (stop == false && !window.closed()){		
+		//Check if there is enough room in inventory to start digging
+		if(PBotCharacterAPI.getEnergy(ui) < 21){
+			PBotUtils.sysMsg(ui, "Not Enough Energy! (21+)");
+			stop = true;
+			break;
+		}
+		let estClayAmount = clayTiles.length*4;
+		let estStorageAmount = clayStockpiles.length*80;
+		info ("est clay: " + estClayAmount);
+		info ("est stockpile: " + estStorageAmount);
+		if(estClayAmount > estStorageAmount){
+			info("Warning, not enough stockpiles:   " + estClayAmount + " clay and " + estStorageAmount + " storage", 2);
+		}
+
+		let shouldIStockpile = false;
+		if (PBotUtils.playerInventory(ui).freeSlotsInv() > FREEINVSLOTS){
+			statusLabel.setText("Enough Inventory Space (" + FREEINVSLOTS + ")");
+			info("Ready to start digging..", 1);			
+		} else {
+			info("Not enough space in inventory.. (" + PBotUtils.playerInventory(ui).freeSlotsInv() + " and you need: " + FREEINVSLOTS + ")", 2);	
+			shouldIStockpile = true;
+		}
+		switch (shouldIStockpile) {
+			case true:
+				if(clayStockpiles.length == 0) {
+					stop = true;
+					PBotUtils.sysMsg(ui, "Ran out of free stockpiles!");
+					break;
+				}
+				statusLabel.setText("Navigate to stockpile");
+				PBotUtils.pfRightClick(ui, clayStockpiles[0], 0);
+				PBotWindowAPI.waitForWindow(ui, "Stockpile");
+				//check for window
+				if (PBotWindowAPI.getWindow(ui, "Stockpile")){
+					//find clay in inventory
+					clayInvAmount = PBotUtils.playerInventory(ui).getInventoryItemsByNames(ITEMNAME).size();
+					const slots = PBotWindowAPI.getStockpileTotalCapacity(ui);
+					const used = PBotWindowAPI.getStockpileUsedCapacity(ui);
+					const count = Math.min(clayInvAmount, slots-used);
+
+					//transfer clay to stockpile
+					PBotWindowAPI.putItemFromInventoryToStockpile(ui, count);
+					PBotUtils.sysMsg(ui, "Tried to add: " + count + " Into a stockpile containing: " + used + "/" + slots);
+					PBotUtils.sleep(300);
+		
+					//update window
+					clayStored += count;
+					clayInvAmount -= count;
+					clayStoredLabel.destroy();
+					clayStoredLabel = window.addLabel("clay stored: " + clayStored, 10, 10);
+					if(count + used === slots){
+						PBotUtils.sysMsg(ui, "Stockpile Full, starting with a new one ..");
+						clayStockpiles.shift();
+					}
+				} else {
+					info("Could not find stockpile window!", 3);
+				}				
+				break;
+			case false:
+				statusLabel.setText("Navigate to dirt");
+				info("Digging..", 1);
+				let func_startTime = Date.now();
+				let func_timeSpentWaiting = 0;
+				let taskDone = false;
+				let amountOfTries = 3;
+				let maxWaitTimeInMiliSeconds = 500;
+				while (!window.closed() && taskDone == false){
+					func_timeSpentWaiting = Math.abs(func_startTime - Date.now());
+					if (func_timeSpentWaiting > maxWaitTimeInMiliSeconds) {
+						taskDone = true;
+						info("time spent waiting: " + func_timeSpentWaiting/1000 + "Seconds (max wait is set to " + maxWaitTimeInMiliSeconds/1000 + "Seconds.)", 2);
+						info("Tile Empty probably empty, will skip to next tile", 3);
+						clayTiles.shift();
+					} else{
+						if (clayTiles.length > 0) {
+								statusLabel.setText("" + clayTiles.length + " Left to dig");
+								info("Pathfinding to the tile .. ", 2);
+								PBotUtils.pfLeftClick(ui, clayTiles[0].x, clayTiles[0].y);
+								while (!window.closed() && PBotGobAPI.player(ui).isMoving()) {
+									info("Waiting for player to standstill again", 2);
+									PBotUtils.sleep(500);
+								}
+								PBotCharacterAPI.doAct(ui, "dig");
+								PBotUtils.mapClick(ui, clayTiles[0].x, clayTiles[0].y, 1, 0);
+								info("Clicking the tile .. ", 2);
+								PBotCharacterAPI.cancelAct(ui);
+								waitForIdle();
+						} else {
+							info("No more clay", 2);
+							taskDone = true;
+							stop = true;
+						}						
+					}
+				
+					PBotUtils.sleep(100); //just to stop it from updating to fast, no need to update faster then once every 0.1seconds		
+				}
+				PBotUtils.sleep(200);
+				//Navigate to nearest Dirt
+				//Am I near Dirt?
+				break;		
+		}
+
+
+
+		let waitTime = 200;
+		info("loop : " + waitTime);
+		PBotUtils.sleep(waitTime);
+		// Store
+		// Dig
+		// Repeat		
+	}
+	PBotUtils.sysMsg(ui, "Bot Done!", 0, 204, 21);
+}
+function searchForVehicles(radius) {
+	let radius = 100;
+	const vehicles = [
+		'gfx/terobjs/vehicle/snekkja', 
+		'gfx/terobjs/vehicle/wagon'
+		//TODO add wagon
+	];
+	for (let i = 0; i < animalGobs.length; i++) {
+		const gob = PBotGobAPI.findGobByNames(ui, parseFloat(radius), vehicles[i]);
+		if (gob) {
+			return gob;
+		}
+	}
+	return null;
+}
+
+
+function waitForIdle() {
+	const maxWaitTICKs = 4;
+	const TICK = 100;
+	let idleCounter = maxWaitTICKs;
+	while (idleCounter >= 0 && !window.closed()) {
+		if (PBotUtils.getHourglass(ui) == -1)
+			idleCounter--;			
+		else {
+			idleCounter = maxWaitTICKs;
+		}
+		if (PBotCharacterAPI.getStamina(ui) < 40) PBotUtils.drink(ui, true); //drink water if stamina is low
+		PBotUtils.sleep(TICK);
+	}
+}
+
+
+function dig (tiles){
+	info("Digging..", 1);
+	let func_startTime = Date.now();
+	let func_timeSpentWaiting = 0;
+	let taskDone = false;
+	while (!window.closed() && taskDone == false){
+		func_timeSpentWaiting = Math.abs(func_startTime - Date.now());
+		if (func_timeSpentWaiting > maxWaitTimeInMiliSeconds) {
+			taskDone = true;
+			info("time spent waiting: " + func_timeSpentWaiting, 2);
+			info("Task took to long, will skip to next step", 3);
+		} else{
+			PBotUtils.pfLeftClick(ui, tiles[0].x, tiles[0].y);
+			PBotCharacterAPI.doAct(ui, "dig");
+			PBotUtils.mapClick(ui, tiles[0].x, tiles[0].y, 1, 0);
+			PBotCharacterAPI.cancelAct(ui);
+			if(!PBotUtils.getHourglass(ui) >= 0) {
+			info("waiting for hourglass", 2)
+			PBotUtils.waitForHourglass(ui, 200);
+			}
+		}
+	
+		PBotUtils.sleep(100); //just to stop it from updating to fast, no need to update faster then once every 0.1seconds		
+	}
+}
+
+
+
+function wait(maxWaitTimeInMiliSeconds = 500){
+	let func_startTime = Date.now();
+	let func_timeSpentWaiting = 0;
+	let taskDone = false;
+	while (!window.closed() && taskDone == false){
+		func_timeSpentWaiting = Math.abs(func_startTime - Date.now());
+		if (func_timeSpentWaiting > maxWaitTimeInMiliSeconds) {
+			taskDone = true;
+			info("time spent waiting: " + func_timeSpentWaiting, 2);
+			info("Task took to long, will skip to next step", 3);
+		}	
+		info("waiting", 2);
+		PBotUtils.sleep(100); //just to stop it from updating to fast, no need to update faster then once every 0.1seconds		
+	}
+}
+
+
+
+//functions for this script
+function selectClayTiles(){
+	let clayTiles = [];
+	info("Select area to dig clay from!", 1);
+	PBotUtils.selectArea(ui);
+	const aCoordDig = PBotUtils.getSelectedAreaA();
+	const bCoordDig = PBotUtils.getSelectedAreaB();
+	const maxX = Math.max(aCoordDig.x, bCoordDig.x);
+	const minX = Math.min(aCoordDig.x, bCoordDig.x);
+	const maxY = Math.max(aCoordDig.y, bCoordDig.y);
+	const minY = Math.min(aCoordDig.y, bCoordDig.y);
+	console.log(maxX + " ja " + minX + " JA " + maxY + " ja " + minY);
+	for(let i=minY; i<maxY; i += 11) {
+		for(let j=minX; j<maxX; j += 11) {
+			if(PBotUtils.tileResnameAt(ui, j, i) === "gfx/tiles/water") {
+				clayTiles.push({x: j, y: i});
+			}
+		}
+	}
+	return clayTiles;
+}
+function selectStockpiles(){
+	let stockpiles = [];
+	info("Select area with stockpiles!", 1);
+	PBotUtils.selectArea(ui);
+	const gobs = PBotUtils.gobsInArea(ui, PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
+	for(let i=0; i<gobs.size(); i++) {
+		if(gobs[i].getResname() === stockpileName)
+			stockpiles.push(gobs[i]);
+	}
+	return stockpiles;
+}
+function returnAllGobsAroundPlayer(){
+	let distanceInTiles = 10; //tiles around player in all directions
+	const playerPos = PBotGobAPI.player(ui).getRcCoords().floor();
+
+	const minX = playerPos.x - distanceInTiles;
+	const maxX = playerPos.x + distanceInTiles;
+	const maxY = playerPos.y - distanceInTiles;
+	const minY = playerPos.y + distanceInTiles;
+
+	PBotUtils.sysMsg(ui, "Area: " + Math.abs(minX-maxX)*Math.abs(minY-maxY));
+
+	let gobs = PBotGobAPI.gobsInArea(minX, maxX, minY, maxY);
+	PBotUtils.sysMsg(ui, "Gobs in area: " + gobs.length);
+	
+	/*
+	let taskStartTime = Date.now();
+	let taskTimeOutSeconds = 3;
+	let takeTimeLapsed = 1;
+	*/
+
+
+}
+function dig (tiles){
+	PBotUtils.pfLeftClick(ui, tiles[0].x, tiles[0].y);
+	PBotCharacterAPI.doAct(ui, "dig");
+	PBotUtils.mapClick(ui, tiles[0].x, tiles[0].y, 1, 0);
+	PBotCharacterAPI.cancelAct(ui);
+	if(!PBotUtils.getHourglass(ui) >= 0) {
+		PBotUtils.waitForHourglass(ui);
+	}
+}
+
+
+
+//functions that are more "helper" sc
+function info(message, i=0) { // 0 = blue, 1 = green, 2 = orange, 3 = red;
+	switch (i) {
+		case 0:
+			func_red = 128;
+			func_green = 192; 
+			func_blue = 200;			
+			break;
+		case 1: // green
+			func_red = 75;
+			func_green = 225; 
+			func_blue = 62;			
+			break;	
+		case 2: // orange
+			func_red = 223;
+			func_green = 113; 
+			func_blue = 38;			
+			break;	
+		case 3: // red
+			func_red = 239;
+			func_green = 11; 
+			func_blue = 11;			
+			break;	
+		default:
+			break;
+	}	
+	PBotUtils.sysMsg(ui, message + "", func_red, func_green, func_blue);
+}
+function printInfoLegend(){
+	PBotUtils.sysMsg(ui, "What the color of the text mean:");
+	info("blue = notification");
+	info("green = good", 1);
+	info("orange = warning", 2);
+	info("red = failure", 3);
+	PBotUtils.sysMsg(ui, "-------------------:");
+}
+function distanceToGob(gob){
+	const gobPos = gob.getRcCoords().floor();
+	const playerPos = PBotGobAPI.player().getRcCoords().floor();
+	const distanceX = gobPos.x - playerPos.x;
+	const distanceY = gobPos.y - playerPos.y;
+	const total =  pythagorean(distanceX, distanceY);
+	return total;
+}
+function pythagorean(sideA, sideB){
+  return Math.sqrt(Math.pow(sideA, 2) + Math.pow(sideB, 2));
+}
+
+
+function btnStartClick(){
+	btnStart.destroy();
+	main();
+}
