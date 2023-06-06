@@ -5,7 +5,7 @@ const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
 const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
 
 let ITEMNAME = "Ball Clay";
-let FREEINVSLOTS = 10;
+let FREEINVSLOTS = 1;
 let stockpileName = 'gfx/terobjs/stockpile-clay';
 
 
@@ -13,7 +13,7 @@ var start = Date.now();
 const WINDOWNAME = "ClayToSnekkja";
 const window = PBotUtils.PBotWindow(ui, WINDOWNAME, 120, 210, ScriptID); // Height then Width
 let clayStoredLabel = window.addLabel("clay stored: ", 10, 10); //Padding Left, Padding Top
-let clayStockpilesLabel = window.addLabel("stockpiles left: ", 10, 30); //Padding Left, Padding Top
+let SnekkjaLabel = window.addLabel("stockpiles left: ", 10, 30); //Padding Left, Padding Top
 let seperatorLabel = window.addLabel("-----------------", 10, 50); //Padding Left, Padding Top
 let statusLabel = window.addLabel("Current Task: ", 10, 60); //Padding Left, Padding Top
 const btnStart = window.addButton("btnStartClick", "Start", 30, 35, 90); //Size, Padding Left, Padding Top
@@ -29,8 +29,8 @@ const main = () => {
 	statusLabel.setText("");
 
 	statusLabel.setText("Select Stockpiles");
-	let clayStockpiles = selectStockpiles();
-    clayStockpilesLabel.setText("stockpiles left: " + clayStockpiles.length);
+	let vehicle = searchForVehicles();
+	SnekkjaLabel.setText("Vehicle found : " + vehicle.getResname());
 
 	while (stop == false && !window.closed()){		
 		//Check if there is enough room in inventory to start digging
@@ -40,53 +40,29 @@ const main = () => {
 			break;
 		}
 		let estClayAmount = clayTiles.length*4;
-		let estStorageAmount = clayStockpiles.length*80;
 		info ("est clay: " + estClayAmount);
-		info ("est stockpile: " + estStorageAmount);
-		if(estClayAmount > estStorageAmount){
-			info("Warning, not enough stockpiles:   " + estClayAmount + " clay and " + estStorageAmount + " storage", 2);
-		}
 
-		let shouldIStockpile = false;
+		let shouldIStoreInVechicle = false;
 		if (PBotUtils.playerInventory(ui).freeSlotsInv() > FREEINVSLOTS){
 			statusLabel.setText("Enough Inventory Space (" + FREEINVSLOTS + ")");
 			info("Ready to start digging..", 1);			
 		} else {
 			info("Not enough space in inventory.. (" + PBotUtils.playerInventory(ui).freeSlotsInv() + " and you need: " + FREEINVSLOTS + ")", 2);	
-			shouldIStockpile = true;
+			shouldIStoreInVechicle = true;
 		}
-		switch (shouldIStockpile) {
+		switch (shouldIStoreInVechicle) {
 			case true:
-				if(clayStockpiles.length == 0) {
-					stop = true;
-					PBotUtils.sysMsg(ui, "Ran out of free stockpiles!");
-					break;
-				}
-				statusLabel.setText("Navigate to stockpile");
-				PBotUtils.pfRightClick(ui, clayStockpiles[0], 0);
-				PBotWindowAPI.waitForWindow(ui, "Stockpile");
-				//check for window
-				if (PBotWindowAPI.getWindow(ui, "Stockpile")){
-					//find clay in inventory
-					clayInvAmount = PBotUtils.playerInventory(ui).getInventoryItemsByNames(ITEMNAME).size();
-					const slots = PBotWindowAPI.getStockpileTotalCapacity(ui);
-					const used = PBotWindowAPI.getStockpileUsedCapacity(ui);
-					const count = Math.min(clayInvAmount, slots-used);
-
-					//transfer clay to stockpile
-					PBotWindowAPI.putItemFromInventoryToStockpile(ui, count);
-					PBotUtils.sysMsg(ui, "Tried to add: " + count + " Into a stockpile containing: " + used + "/" + slots);
-					PBotUtils.sleep(300);
-		
-					//update window
-					clayStored += count;
-					clayInvAmount -= count;
-					clayStoredLabel.destroy();
-					clayStoredLabel = window.addLabel("clay stored: " + clayStored, 10, 10);
-					if(count + used === slots){
-						PBotUtils.sysMsg(ui, "Stockpile Full, starting with a new one ..");
-						clayStockpiles.shift();
-					}
+				statusLabel.setText("Clicking on vehicle");
+				vehicle.doClick(3, 0);
+				PBotUtils.waitForFlowerMenu(ui);
+				if (PBotUtils.choosePetal(ui, "Cargo")) {
+					PBotWindowAPI.waitForWindow(ui, "Snekkja"); //todo add support for wagon
+				}	
+				if (PBotWindowAPI.getWindow(ui, "Snekkja")){	
+					statusLabel.setText("Snekkja Window Open");
+					PBotUtils.sysMsg(ui, "Transfering clay to vehicle");				
+					unloadItems(ITEMNAME);
+					PBotUtils.sleep(1000);
 				} else {
 					info("Could not find stockpile window!", 3);
 				}				
@@ -109,8 +85,8 @@ const main = () => {
 					} else{
 						if (clayTiles.length > 0) {
 								statusLabel.setText("" + clayTiles.length + " Left to dig");
-								info("Pathfinding to the tile .. ", 2);
-								PBotUtils.pfLeftClick(ui, clayTiles[0].x, clayTiles[0].y);
+								info("Navigating to the tile .. ", 2);
+								PBotUtils.mapClick(ui, clayTiles[0].x, clayTiles[0].y, 1, 0);
 								while (!window.closed() && PBotGobAPI.player(ui).isMoving()) {
 									info("Waiting for player to standstill again", 2);
 									PBotUtils.sleep(500);
@@ -134,9 +110,6 @@ const main = () => {
 				//Am I near Dirt?
 				break;		
 		}
-
-
-
 		let waitTime = 200;
 		info("loop : " + waitTime);
 		PBotUtils.sleep(waitTime);
@@ -146,14 +119,27 @@ const main = () => {
 	}
 	PBotUtils.sysMsg(ui, "Bot Done!", 0, 204, 21);
 }
-function searchForVehicles(radius) {
-	let radius = 100;
+function unloadItems(items) {
+	let invItems = null;
+	try {
+		invItems = PBotUtils.playerInventory(ui).getInventoryItemsByNames(items);
+		for (let i of invItems)
+			i.transferItem();
+	} catch (e) {
+		PBotUtils.sysMsg(ui, "unloadItems() error: " + e, 200, 4, 21);
+		return false;
+	}
+	return true;
+}
+
+
+function searchForVehicles(radius = 100) {
 	const vehicles = [
 		'gfx/terobjs/vehicle/snekkja', 
 		'gfx/terobjs/vehicle/wagon'
 		//TODO add wagon
 	];
-	for (let i = 0; i < animalGobs.length; i++) {
+	for (let i = 0; i < vehicles.length; i++) {
 		const gob = PBotGobAPI.findGobByNames(ui, parseFloat(radius), vehicles[i]);
 		if (gob) {
 			return gob;
@@ -191,7 +177,6 @@ function dig (tiles){
 			info("time spent waiting: " + func_timeSpentWaiting, 2);
 			info("Task took to long, will skip to next step", 3);
 		} else{
-			PBotUtils.pfLeftClick(ui, tiles[0].x, tiles[0].y);
 			PBotCharacterAPI.doAct(ui, "dig");
 			PBotUtils.mapClick(ui, tiles[0].x, tiles[0].y, 1, 0);
 			PBotCharacterAPI.cancelAct(ui);
@@ -280,7 +265,6 @@ function returnAllGobsAroundPlayer(){
 
 }
 function dig (tiles){
-	PBotUtils.pfLeftClick(ui, tiles[0].x, tiles[0].y);
 	PBotCharacterAPI.doAct(ui, "dig");
 	PBotUtils.mapClick(ui, tiles[0].x, tiles[0].y, 1, 0);
 	PBotCharacterAPI.cancelAct(ui);

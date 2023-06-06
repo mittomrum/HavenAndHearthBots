@@ -102,7 +102,7 @@ const main = () => {
     }
     function waitForIdle() {
         const maxWaitTICKs = 4;
-        const TICK = 200;
+        const TICK = 100;
         let idleCounter = maxWaitTICKs;
         while (idleCounter >= 0 && !shouldStop()) {
             if (PBotUtils.getHourglass(ui) == -1)

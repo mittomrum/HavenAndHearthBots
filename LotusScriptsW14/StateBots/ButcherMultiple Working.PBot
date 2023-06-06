@@ -73,48 +73,52 @@ const main = () => {
 
         if (cboxSkin.getValue()) {
             gob.doClick(3, 0);
-            PBotUtils.waitForFlowerMenu();
-            if (PBotUtils.choosePetal("Skin")) {
+            PBotUtils.waitForFlowerMenu(ui);
+            if (PBotUtils.choosePetal(ui, "Skin")) {
                 updateWindow("Skinning", getProgressBar(0.25));
                 PBotUtils.sysMsg(ui, "Going to Skin");
-                PBotUtils.waitForHourglass(500);
-                PBotUtils.dropItemFromHand(0);
+                PBotUtils.waitForHourglass(ui, 5000);
+                PBotUtils.sleep(2000);
+                PBotUtils.dropItemFromHand(ui, 500);
             }
         }
         if (cboxClean.getValue()) {
             gob.doClick(3, 0);
-            PBotUtils.waitForFlowerMenu();
-            if (PBotUtils.choosePetal("Clean")) {
+            PBotUtils.waitForFlowerMenu(ui);
+            if (PBotUtils.choosePetal(ui, "Clean")) {
                 updateWindow("Cleaning", getProgressBar(0.5));
                 PBotUtils.sysMsg(ui, "Going to Clean");
-                PBotUtils.waitForHourglass(500);
-                PBotUtils.dropItemFromHand(0);
+                PBotUtils.waitForHourglass(ui, 5000);
+                PBotUtils.sleep(2000);
+                PBotUtils.dropItemFromHand(ui, 500);
             }
         }
         if (cboxButcher.getValue()) {
             gob.doClick(3, 0);
-            PBotUtils.waitForFlowerMenu();
-            if (PBotUtils.choosePetal("Butcher")) {
+            PBotUtils.waitForFlowerMenu(ui);
+            if (PBotUtils.choosePetal(ui, "Butcher")) {
                 updateWindow("Butchering", getProgressBar(0.75));
                 PBotUtils.sysMsg(ui, "Going to Butcher");
-                PBotUtils.waitForHourglass();
-                PBotUtils.dropItemFromHand(500);
+                PBotUtils.waitForHourglass(ui, 5000);
+                PBotUtils.sleep(2000);
+                PBotUtils.dropItemFromHand(ui, 500);
             }
         }
         if (cboxBones.getValue()) {
             gob.doClick(3, 0);
-            PBotUtils.waitForFlowerMenu();
-            if (PBotUtils.choosePetal("Collect bones")) {
+            PBotUtils.waitForFlowerMenu(ui);
+            if (PBotUtils.choosePetal(ui, "Collect bones")) {
                 updateWindow("Collecting Bones", getProgressBar(1));
                 PBotUtils.sysMsg(ui, "Going to Collect bones");
-                PBotUtils.waitForHourglass(500);
-                PBotUtils.dropItemFromHand(0);
+                PBotUtils.waitForHourglass(ui, 5000);
+                PBotUtils.sleep(2000);
+                PBotUtils.dropItemFromHand(ui, 500);
             }
         }
 
         PBotUtils.sysMsg(ui, "Close the window to stop");
-        PBotUtils.sysMsg(ui, "Waiting 1000ms");
-        PBotUtils.sleep(1000);
+        PBotUtils.sysMsg(ui, "Waiting 2000ms");
+        PBotUtils.sleep(2000);
         target.destroy();
         targetDistance.destroy();
     } while (!stop && !window.closed());
@@ -125,13 +129,13 @@ const main = () => {
 function pfToGob(gob) {
     // wait for player to start moving, then for player to stop
     do {
-        if (!PBotGobAPI.player().isMoving()) { //Standing still
+        if (!PBotGobAPI.player(ui).isMoving()) { //Standing still
             if (!gob.pfClick(1, 0)) {
                 PBotUtils.sysMsg(ui, "Cant find a way to path to the object");
             }
             PBotUtils.sleep(300);
         }
-        if (PBotGobAPI.player().isMoving()) {
+        if (PBotGobAPI.player(ui).isMoving()) {
             PBotUtils.sysMsg(ui,"movin' I am waiting 300ms");
             PBotUtils.sleep(300);
         }
@@ -139,7 +143,7 @@ function pfToGob(gob) {
 }
 function distanceToGob(gob) {
     const gobPos = gob.getRcCoords().floor();
-    const playerPos = PBotGobAPI.player().getRcCoords().floor();
+    const playerPos = PBotGobAPI.player(ui).getRcCoords().floor();
     const distanceX = gobPos.x - playerPos.x;
     const distanceY = gobPos.y - playerPos.y;
     const total = pythagorean(distanceX, distanceY);

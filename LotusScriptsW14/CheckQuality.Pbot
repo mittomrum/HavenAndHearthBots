@@ -15,7 +15,7 @@ const btnStartClick = () => {
     btnStart.show();
 }
 ///////////////
-const tick = 500;
+const TICK = 500;
 let stop;
 const shouldStop = () => {
     return stop || window.closed();

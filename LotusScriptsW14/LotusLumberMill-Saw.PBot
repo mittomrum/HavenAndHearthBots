@@ -1,0 +1,246 @@
+//init
+const ui = Java.type('haven.purus.pbot.PBotAPI').ui();
+const hcConfig = Java.type('haven.Config');
+const PBotUtils = Java.type('haven.purus.pbot.PBotUtils');
+const PBotGobAPI = Java.type('haven.purus.pbot.PBotGobAPI');
+const PBotWindowAPI = Java.type('haven.purus.pbot.PBotWindowAPI');
+const PBotCharacterAPI = Java.type('haven.purus.pbot.PBotCharacterAPI');
+
+const VERSIONNAME = "Prototype-0.2(2023-05-21)"
+const WINDOWNAME = "LumberMill-saw";
+const HOWTO = "HOWTO:\n  1. Press start\n  2. Select area with logs \n";
+const TICK = 500;
+const PEDALOPTION = "Make boards";
+
+const messageLevel = 3;
+var stopmsg = [];
+var start = Date.now();
+
+////////////////
+windowWidth = 120;
+windowHeight = 150;
+const window = PBotUtils.PBotWindow(ui, WINDOWNAME, windowWidth, windowHeight, ScriptID);
+const btnStart = window.addButton("btnStartClick", "Start", 80, 24, 0);
+const howtoBtn = window.addButton("howtoBtnClick", "?", 24, 104, 0);
+const statusLbl = window.addLabel("Select area with logs ..", 10, 10);
+const progressLbl = window.addLabel("", 10, 25);
+const timeLbl = window.addLabel(" ", 10, 40);
+const estLbl = window.addLabel(" ", 10, 60);
+const devider = window.addLabel("_____________", 25, 65);
+const activityLbl = window.addLabel(" ", 10, 85);
+statusLbl.hide();
+progressLbl.hide();
+estLbl.hide();
+timeLbl.hide();
+devider.hide();
+activityLbl.hide();
+const btnStartClick = () => {
+	btnStart.hide();
+	howtoBtn.hide();
+	start = Date.now();
+	main()
+	statusLbl.hide();
+	progressLbl.hide();
+	estLbl.hide();
+	timeLbl.hide();
+	devider.hide();
+  activityLbl.hide();
+	btnStart.show();
+	howtoBtn.show();
+	info("Done", 0);
+}
+const howtoBtnClick = () => {
+	info(WINDOWNAME + " " + VERSIONNAME + " " + HOWTO, 0)
+}
+///////////////
+const main = () => {
+    statusLbl.show();
+	progressLbl.show();
+	estLbl.show();
+	timeLbl.show();
+	devider.show();
+    activityLbl.show();
+
+    /*statusLbl.setText("Added Workorders!");
+    statusLbl.setText("Sorting Workorders");
+    statusLbl.setText("Sorting Done!");
+    statusLbl.setText("Amount of Logs: " + order.length);
+
+    activityLbl.setText("Working on new gob, Please wait...");
+    activityLbl.setText("Walking, Please wait...")*/
+
+    var aLogs = [];
+    PBotUtils.selectArea(ui);
+    let allGobs = PBotUtils.gobsInArea(ui, PBotUtils.getSelectedAreaA(), PBotUtils.getSelectedAreaB());
+    for (let g of allGobs) {
+        if (isLog(g))
+            aLogs.push(g);
+    }
+    let order = aLogs;
+    if (order == null) {
+        info("No logs found", 1);
+        return;
+    }
+    order = order.sort(
+        (a, b) =>
+            PBotGobAPI.player(ui).getRcCoords().dist(a.getRcCoords()) - PBotGobAPI.player(ui).getRcCoords().dist(b.getRcCoords())
+    );
+    info("Amount of logs: " + order.length, 1);
+    statusLbl.setText("Amount of Logs: " + order.length);
+
+
+    let processed = 0; 
+    order.forEach((gob) => {
+        let OrderStartTime = Date.now();
+        //format the time to a more readable format
+        info("OrderStartTime " + OrderStartTime, 2);
+        if (!window.closed() && !irq()) {
+            const maxWaitTicks = 3;
+            let idleCounter = maxWaitTicks;
+            var stutterStepTimes = 0;
+            while (idleCounter >= 0 && !irq() && PBotGobAPI.findGobById(ui, gob.gob.id) != null) {
+                let timelapsed = ((Date.now() - OrderStartTime) / 1000).toFixed(1);
+                if (!PBotGobAPI.player(ui).isMoving()) { idleCounter--; }
+                else { idleCounter = maxWaitTicks; }
+                if (!isProcessingLog() && !PBotGobAPI.player(ui).isMoving()) {
+                    info("Will start sawing : " + gob.getResname(), 2);
+                    saw(gob);
+                    PBotUtils.sleep(TICK);
+                } else if (isProcessingLog()) {
+                    info("Processing log, waiting for it to finish", 2);
+                }
+                PBotUtils.sleep(TICK);
+
+                if (timelapsed >= 0 && timelapsed < 3) {
+                    PBotUtils.sysMsg(ui, timelapsed + "  Seconds Lapsed", 80, 130, 120);
+                } else
+                    if (timelapsed >= 3 && timelapsed < 5) {
+                        PBotUtils.sysMsg(ui, timelapsed + "  Seconds Lapsed", 200, 160, 20);
+                    } else
+                        if (timelapsed >= 5 && timelapsed < 10) {
+                            PBotUtils.sysMsg(ui, timelapsed + "  Seconds Lapsed", 255, 40, 10);
+                        } else
+                            if (timelapsed >= 10) { // 2seconds for the bot to stutterstep, if this fails it will continue whatever it's stuck on
+                                PBotUtils.sysMsg(ui, timelapsed + "  Seconds Lapsed", 200, 50, 20);
+                                if (stutterStepTimes < 1) {
+                                    stutterStep();
+                                    stutterStepTimes++;
+                                }
+                            }
+                if (timelapsed >= 20) {
+                    PBotUtils.sysMsg(ui, "Crash, sorry about that!", 255, 40, 10);
+                    err("Took to long to finnish the bot");
+                }
+            }
+        }
+        processed++;
+
+    });
+}
+///////////////////
+function isLog(a) {
+	let res = false;
+	try {
+		let gobName = a.getResname();
+		res = gobName.endsWith("log");
+	} catch(e) {info("isLog: " + e, 2)};
+	return res;
+}
+function isProcessingLog() {
+    info("Checking if processing log", 2);
+    //Check for hourglass
+    //Check for stamina depletion over the span of time
+    let startingStamina = PBotCharacterAPI.getStamina(ui);
+    PBotUtils.sleep(500);
+    let endingStamina = PBotCharacterAPI.getStamina(ui);
+    if (startingStamina - endingStamina > 5) {
+        info("Stamina is draining, I am probably processing a log!", 2);
+        return true;
+    }
+}
+
+function saw(gob) {
+	const targetResname = gob.getResname().toString();
+	activityLbl.setText("Target: " + targetResname);
+	sinfo("Target: " + targetResname, 1);
+
+    if (PBotGobAPI.findGobById(ui, gob.gob.id) !== null) {        
+        const rightClickMsg = "Right click .. " + gob.getResname();
+        activityLbl.setText(rightClickMsg);
+        info(rightClickMsg, 2);
+        gob.doClick(3, 0);
+
+        PBotUtils.sleep(TICK);
+
+        const pedalChoiceMsg = "choice .. " + PEDALOPTION;
+        activityLbl.setText(pedalChoiceMsg);
+        info(pedalChoiceMsg, 2);
+        PBotUtils.choosePetal(ui, PEDALOPTION);
+
+        waitForIdle();
+	}
+}
+
+function updatetime(){
+  info("updating time, please wait .. ", 1);
+	let seconds = (Date.now()-start)/1000;
+	let minutes = Math.floor((seconds)/60);
+	seconds = Math.floor(seconds%60);
+	timeLbl.setText(minutes + " min " + seconds + " sec ");
+}
+function waitForIdle() {
+  activityLbl.setText("Wait for idle ..");
+  info("Wait for idle", 4);
+	const tick = 100;
+	const maxWaitTicks = 5;
+	let idleCounter = maxWaitTicks;
+	while (idleCounter >= 0 && !irq()) {
+		if ((PBotUtils.getHourglass(ui) == -1)
+			||
+			(PBotUtils.getHourglass(ui) >= 0.8)
+			&&
+			(!PBotGobAPI.player(ui).isMoving()))
+		idleCounter--;
+		else {
+			idleCounter = maxWaitTicks;
+			PBotUtils.sleep(tick);
+			info("Idle", 4);
+			updatetime();
+			if (PBotCharacterAPI.getStamina(ui) < 60)
+				PBotUtils.drink(ui, true);
+		}
+	}
+}
+function info(s, l) {
+	if (l <= messageLevel)
+		PBotUtils.sysMsg(ui, s + "", 128, 192, 200);
+}
+function sinfo(s, l) {
+	if (l <= messageLevel)
+		PBotUtils.sysMsg(ui, s + "", 50, 200, 60);
+}
+function err(s) {
+	stopmsg.push(s);
+}
+function irq() {
+	if (PBotCharacterAPI.getStamina(ui) < 35) {
+		err("Out of stamina");
+	}
+	if (PBotCharacterAPI.getEnergy(ui) < 35) {
+		err("Out of energy");
+	}
+	if (PBotWindowAPI.getWindow(ui, WINDOWNAME) == null) {
+		info("Stopped", 0);
+		return true;
+	}
+	if (stopmsg.length == 0) {
+		return false;
+	} else {
+		let errstr = "⚠ ";
+		for (let r of stopmsg) {
+			errstr += r + " ⚠ ";
+		}
+		PBotUtils.sysMsg(ui, errstr, 255, 128, 0);
+		return true;
+	}
+}
